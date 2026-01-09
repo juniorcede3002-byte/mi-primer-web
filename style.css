@@ -1,29 +1,166 @@
-body { font-family: 'Inter', sans-serif; letter-spacing: -0.01em; }
+/* --- CONFIGURACIÓN DE COLORES Y VARIABLES --- */
+:root {
+  --primary: #4f46e5;
+  --primary-light: #eef2ff;
+  --bg-app: #f8fafc;
+  --sidebar-w: 288px;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
 
+/* --- RESET Y BASE --- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+/* --- COMPONENTES DE INTERFAZ --- */
+
+/* Entradas de texto personalizadas */
 .input-light {
-    background-color: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    padding: 0.75rem 1rem;
-    border-radius: 0.75rem;
-    outline: none;
-    transition: all 0.2s;
+  width: 100%;
+  background-color: #ffffff;
+  border: 1.5px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
 }
-.input-light:focus { border-color: #6366f1; background-color: white; }
 
+.input-light:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+/* Tarjetas de Métricas (Dashboard) */
 .card-metrica {
-    background: white;
-    padding: 1.5rem;
-    border-radius: 1.5rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s;
 }
-.card-metrica span { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; }
-.card-metrica h2 { font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem; }
 
-.badge { padding: 4px 12px; border-radius: 99px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
-.status-pendiente { background: #fef3c7; color: #92400e; }
-.status-aprobado { background: #dcfce7; color: #15803d; }
-.status-rechazado { background: #fee2e2; color: #b91c1c; }
+.card-metrica:hover {
+  transform: translateY(-2px);
+}
 
-.view { animation: fadeIn 0.3s ease-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card-metrica span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-metrica h2 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin-top: 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+/* Estados (Badges) */
+.badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-pendiente { background-color: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.status-aprobado { background-color: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.status-rechazado { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* --- RESPONSIVE Y NAVEGACIÓN --- */
+
+/* Sidebar para móviles */
+@media (max-width: 768px) {
+  #sidebar {
+    width: 100%;
+    max-width: 300px;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.1);
+  }
+  
+  main {
+    margin-left: 0 !important;
+    padding: 1rem !important;
+  }
+}
+
+/* Estilo de la Tabla (Historial) */
+.table-container {
+  overflow-x: auto;
+  border-radius: 1rem;
+}
+
+table {
+  width: 100%;
+  border-spacing: 0;
+}
+
+th {
+  background-color: #f8fafc;
+  padding: 1rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-bottom: 1.5px solid var(--border-color);
+}
+
+td {
+  padding: 1rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* Animaciones */
+.view {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar Personalizado */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
