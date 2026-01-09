@@ -1,218 +1,51 @@
 :root {
   --primary: #6366f1;
-  --primary-dark: #4f46e5;
-  --success: #22c55e;
-  --danger: #ef4444;
   --bg: #0f172a;
-  --card: rgba(255,255,255,0.12);
-  --border: rgba(255,255,255,0.18);
-  --text: #e5e7eb;
+  --card: rgba(30, 41, 59, 0.7);
+  --border: rgba(255, 255, 255, 0.1);
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at top, #1e293b, #020617);
-  color: var(--text);
-}
-
-/* ===== GLASS EFFECT ===== */
 .glass {
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(12px);
   background: var(--card);
   border: 1px solid var(--border);
 }
 
-/* ===== LOGIN ===== */
 .login-overlay {
   position: fixed;
   inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  background: radial-gradient(circle at center, #1e293b, #020617);
+  display: flex; justify-content: center; align-items: center;
 }
 
-.login-card {
-  width: 340px;
-  padding: 35px;
-  border-radius: 20px;
-  animation: pop 0.5s ease;
+.login-card { width: 380px; padding: 40px; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+
+.menu-btn {
+  width: 100%; text-align: left; padding: 12px 16px; border-radius: 12px;
+  color: #94a3b8; transition: all 0.3s;
 }
+.menu-btn:hover { background: rgba(99, 102, 241, 0.1); color: white; }
 
-.login-card h1 {
-  margin-bottom: 5px;
+.metric-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  padding: 24px; border-radius: 20px; border: 1px solid var(--border);
 }
+.metric-number { font-size: 2.5rem; font-weight: 800; line-height: 1; margin-top: 10px; }
 
-.login-card p {
-  opacity: 0.8;
-  margin-bottom: 25px;
-}
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; }
 
-/* ===== LAYOUT ===== */
-#interfaz-app {
-  display: flex;
-}
+.btn-primary { background: var(--primary); color: white; border-radius: 12px; transition: opacity 0.2s; }
+.btn-primary:hover { opacity: 0.9; }
 
-.sidebar {
-  width: 230px;
-  min-height: 100vh;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.status-pendiente { @apply bg-yellow-500/20 text-yellow-500 border border-yellow-500/50; }
+.status-aprobado { @apply bg-green-500/20 text-green-500 border border-green-500/50; }
+.status-rechazado { @apply bg-red-500/20 text-red-500 border border-red-500/50; }
 
-.brand {
-  font-weight: bold;
-  font-size: 1.2rem;
-  margin-bottom: 20px;
-}
+.badge { padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
 
-.sidebar button {
-  background: transparent;
-  border: none;
-  color: var(--text);
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.25s, transform 0.15s;
-}
-
-.sidebar button:hover {
-  background: rgba(255,255,255,0.12);
-  transform: translateX(4px);
-}
-
-.btn-logout {
-  margin-top: auto;
-  background: var(--danger) !important;
-  text-align: center;
-}
-
-/* ===== CONTENT ===== */
-.content {
-  flex: 1;
-  padding: 35px;
-  animation: fade 0.4s ease;
-}
-
-.view {
-  display: none;
-}
-
-h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
-}
-
-/* ===== CARDS ===== */
-.card {
-  border-radius: 18px;
-  padding: 25px;
-  margin-bottom: 25px;
-}
-
-.interactive {
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.interactive:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 25px 40px rgba(0,0,0,.4);
-}
-
-/* ===== FORMS ===== */
-input, select {
-  width: 100%;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: rgba(0,0,0,0.3);
-  color: var(--text);
-}
-
-input:focus, select:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-/* ===== BUTTONS ===== */
-.btn-primary {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  border: none;
-  color: white;
-  border-radius: 12px;
-  padding: 12px;
-  cursor: pointer;
-}
-
-.btn-success {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  border: none;
-  border-radius: 12px;
-  padding: 14px;
-  font-weight: bold;
-}
-
-/* ===== GRID ===== */
-.grid-productos {
-  display: grid;
-  gap: 15px;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-}
-
-.prod-card {
-  padding: 15px;
-  border-radius: 14px;
-  background: rgba(0,0,0,0.35);
-  border: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  animation: fade 0.25s ease;
-}
-
-/* ===== PEDIDOS ===== */
-.pedido-card {
-  background: rgba(0,0,0,0.35);
-  padding: 15px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-}
-
-/* ===== BADGES ===== */
-.badge {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: bold;
-}
-
-.status-pendiente { background: #facc15; color: #1e293b; }
-.status-aprobado { background: #22c55e; color: #052e16; }
-.status-rechazado { background: #ef4444; }
-
-/* ===== ANIMATIONS ===== */
-@keyframes fade {
-  from { opacity: 0; transform: translateY(6px); }
+/* Animación de entrada */
+.view { animation: slideUp 0.4s ease-out; }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pop {
-  from { opacity: 0; transform: scale(0.9); }
-  to { opacity: 1; transform: scale(1); }
 }
