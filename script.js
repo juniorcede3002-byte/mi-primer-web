@@ -1,9 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { 
-  getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc 
+  getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc 
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// 1. CONFIGURACIÓN CON TUS API KEYS
 const firebaseConfig = {
   apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
   authDomain: "mi-web-db.firebaseapp.com",
@@ -13,85 +12,89 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const lista = document.getElementById("lista");
-const sugerencias = document.getElementById("productos-sugeridos");
+// NAVEGACIÓN ENTRE PÁGINAS
+window.verPagina = (id) => {
+  document.getElementById('pag-admin').style.display = id === 'admin' ? 'block' : 'none';
+  document.getElementById('pag-solicitar').style.display = id === 'solicitar' ? 'block' : 'none';
+};
 
-// --- FUNCIONES ---
+// --- LOGICA DE INVENTARIO (ADMIN) ---
 
-// 2. AGREGAR O SUMAR SI YA EXISTE
 window.agregarProducto = async () => {
-  const nombreInput = document.getElementById("nombre");
-  const cantidadInput = document.getElementById("cantidad");
-  
-  const nombre = nombreInput.value.trim().toLowerCase(); 
-  const cantidad = parseInt(cantidadInput.value);
+  const nombre = document.getElementById("nombre").value.trim().toLowerCase();
+  const cantidad = parseInt(document.getElementById("cantidad").value);
 
-  if (!nombre || isNaN(cantidad)) return alert("Ingresa nombre y cantidad válida");
+  if (!nombre || isNaN(cantidad)) return alert("Datos inválidos");
 
   const docRef = doc(db, "inventario", nombre);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
-    // Suma a lo existente
-    const nuevaCantidad = docSnap.data().cantidad + cantidad;
-    await updateDoc(docRef, { cantidad: nuevaCantidad });
+    await updateDoc(docRef, { cantidad: docSnap.data().cantidad + cantidad });
   } else {
-    // Crea nuevo
     await setDoc(docRef, { nombre, cantidad });
   }
-
-  nombreInput.value = "";
-  cantidadInput.value = "";
+  document.getElementById("nombre").value = "";
+  document.getElementById("cantidad").value = "";
 };
 
-// 3. ELIMINAR PRODUCTO
-window.eliminarProducto = async (id) => {
-  if(confirm(`¿Seguro que quieres borrar "${id.toUpperCase()}"?`)) {
-    await deleteDoc(doc(db, "inventario", id));
+// --- LOGICA DE SOLICITUD (RESTAR STOCK) ---
+
+window.procesarSolicitud = async () => {
+  const usuario = document.getElementById("sol-usuario").value;
+  const ubicacion = document.getElementById("sol-ubicacion").value;
+  const insumoNom = document.getElementById("sol-insumo").value.trim().toLowerCase();
+  const cantSolicitada = parseInt(document.getElementById("sol-cantidad").value);
+
+  if (!usuario || !insumoNom || isNaN(cantSolicitada)) return alert("Completa todos los campos");
+
+  const docRef = doc(db, "inventario", insumoNom);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    return alert("El producto no existe en el inventario.");
   }
-};
 
-// 4. RESTAR CANTIDAD
-window.restarUno = async (id, cantidadActual) => {
-  const docRef = doc(db, "inventario", id);
-  if (cantidadActual > 0) {
-    await updateDoc(docRef, { cantidad: cantidadActual - 1 });
-  } else {
-    window.eliminarProducto(id);
+  const stockActual = docSnap.data().cantidad;
+
+  if (stockActual < cantSolicitada) {
+    return alert(`Stock insuficiente. Solo quedan ${stockActual} unidades.`);
   }
+
+  // 1. Restar del inventario
+  await updateDoc(docRef, { cantidad: stockActual - cantSolicitada });
+
+  // 2. Opcional: Guardar un registro del pedido
+  await addDoc(collection(db, "pedidos"), {
+    usuario, ubicacion, insumoNom, cantidad: cantSolicitada, fecha: new Date()
+  });
+
+  alert("✅ Solicitud procesada y stock descontado.");
+  
+  // Limpiar campos
+  document.getElementById("sol-insumo").value = "";
+  document.getElementById("sol-cantidad").value = "";
 };
 
-// 5. SUMAR CANTIDAD
-window.sumarUno = async (id, cantidadActual) => {
-  const docRef = doc(db, "inventario", id);
-  await updateDoc(docRef, { cantidad: cantidadActual + 1 });
-};
+// --- RENDERIZADO EN TIEMPO REAL ---
 
-// 6. ESCUCHAR CAMBIOS Y ACTUALIZAR LISTA + SUGERENCIAS
 onSnapshot(collection(db, "inventario"), (querySnapshot) => {
+  const lista = document.getElementById("lista");
+  const sugerencias = document.getElementById("productos-sugeridos");
   lista.innerHTML = "";
-  sugerencias.innerHTML = ""; 
+  sugerencias.innerHTML = "";
 
   querySnapshot.forEach((doc) => {
     const p = doc.data();
-    const id = doc.id;
-    
-    // Llenar Lista Visual
     lista.innerHTML += `
       <li>
-        <div>
-          <strong style="text-transform: uppercase;">${p.nombre}</strong><br>
-          <span style="color: #666;">${p.cantidad} unidades</span>
-        </div>
-        <div class="controles">
-          <button onclick="sumarUno('${id}', ${p.cantidad})">+</button>
-          <button onclick="restarUno('${id}', ${p.cantidad})">-</button>
-          <button class="btn-eliminar" onclick="eliminarProducto('${id}')">🗑️</button>
-        </div>
-      </li>
-    `;
-
-    // Llenar Datalist de Sugerencias
+        <div><strong style="text-transform:uppercase">${p.nombre}</strong><br>Stock: ${p.cantidad}</div>
+        <button class="btn-eliminar" onclick="eliminarProducto('${doc.id}')">🗑️</button>
+      </li>`;
     sugerencias.innerHTML += `<option value="${p.nombre}">`;
   });
 });
+
+window.eliminarProducto = async (id) => {
+  if(confirm("¿Borrar?")) await deleteDoc(doc(db, "inventario", id));
+};

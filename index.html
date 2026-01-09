@@ -3,23 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Inventario Pro</title>
+  <title>Sistema de Gestión</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+  <nav class="navbar">
+    <button onclick="verPagina('admin')">📦 Inventario</button>
+    <button onclick="verPagina('solicitar')">📝 Solicitar</button>
+  </nav>
+
   <div class="container">
-    <h1>📦 Inventario Inteligente</h1>
+    <section id="pag-admin">
+      <h1>📦 Administración</h1>
+      <div class="formulario">
+        <input id="nombre" placeholder="Producto" list="productos-sugeridos" autocomplete="off">
+        <datalist id="productos-sugeridos"></datalist>
+        <input id="cantidad" type="number" placeholder="Cant.">
+        <button class="btn-principal" onclick="agregarProducto()">Actualizar Stock</button>
+      </div>
+      <ul id="lista"></ul>
+    </section>
 
-    <div class="formulario">
-      <input id="nombre" placeholder="Nombre del producto" list="productos-sugeridos" autocomplete="off">
-      <datalist id="productos-sugeridos"></datalist>
-      
-      <input id="cantidad" type="number" placeholder="Cant.">
-      <button class="btn-principal" onclick="agregarProducto()">Agregar / Sumar</button>
-    </div>
-
-    <ul id="lista"></ul>
+    <section id="pag-solicitar" style="display:none;">
+      <h1>📝 Solicitar Insumo</h1>
+      <p>Completa los datos para retirar del inventario.</p>
+      <div class="formulario">
+        <input id="sol-usuario" placeholder="Tu Nombre">
+        <input id="sol-ubicacion" placeholder="Ubicación / Departamento">
+        <input id="sol-insumo" placeholder="Tipo de insumo" list="productos-sugeridos">
+        <input id="sol-cantidad" type="number" placeholder="Cantidad a retirar">
+        <button class="btn-solicitar" onclick="procesarSolicitud()">Confirmar Retiro</button>
+      </div>
+      <div id="mensaje-solicitud"></div>
+    </section>
   </div>
 
   <script type="module" src="script.js"></script>
