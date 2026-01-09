@@ -1,104 +1,176 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InsuManager | Pro</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>InsuManager Pro | Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Fuente -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        fontFamily: { sans: ['Inter', 'sans-serif'] }
+      }
+    }
+  </script>
 </head>
-<body>
 
-    <div id="pantalla-login" class="login-overlay">
-        <div class="login-card glass">
-            <h1>InsuManager</h1>
-            <p>Gestión de Insumos y Pedidos</p>
-            <input type="text" id="login-user" placeholder="Usuario">
-            <input type="password" id="login-pass" placeholder="Contraseña">
-            <button onclick="iniciarSesion()" class="btn-primary" style="width:100%; margin-top:10px;">Entrar</button>
-        </div>
-    </div>
+<body class="bg-slate-900 text-slate-200 font-sans">
 
-    <div id="interfaz-app" style="display: none;">
-        <aside class="sidebar glass">
-            <div class="brand">📦 InsuManager</div>
-            <nav id="menu">
-                <button id="nav-admin" onclick="verPagina('admin')">🏠 Inventario</button>
-                <button id="nav-pedidos" onclick="verPagina('pedidos')">⏳ Pedidos</button>
-                <button id="nav-historial" onclick="verPagina('historial')">🕒 Historial</button>
-                <button id="nav-usuarios" onclick="verPagina('usuarios')">👥 Usuarios</button>
-                <hr style="opacity: 0.1; margin: 10px 0;">
-                <button id="nav-ver-stock" onclick="verPagina('ver-stock')">👁️ Ver Stock</button>
-                <button id="nav-solicitar" onclick="verPagina('solicitar')">✍️ Solicitar</button>
-                <button id="nav-mis-pedidos" onclick="verPagina('mis-pedidos')">📦 Mis Pedidos</button>
-            </nav>
-            <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
-        </aside>
+<div class="flex min-h-screen">
 
-        <main class="content">
-            <div id="pag-admin" class="view">
-                <h2>Panel de Inventario</h2>
-                <div class="card glass">
-                    <div class="form-grid">
-                        <input type="text" id="nombre" placeholder="Nombre producto">
-                        <input type="number" id="cantidad" placeholder="Cantidad">
-                        <button onclick="agregarProducto()" class="btn-primary">Guardar</button>
-                    </div>
-                </div>
-                <div id="lista-inventario" class="grid-productos"></div>
-            </div>
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-slate-950 border-r border-slate-800 p-5 hidden md:block">
+    <h1 class="text-xl font-bold mb-8">📦 InsuManager</h1>
 
-            <div id="pag-solicitar" class="view">
-                <h2>Nueva Solicitud</h2>
-                <div class="card glass">
-                    <div class="form-grid">
-                        <input type="text" id="sol-usuario" readonly class="muted">
-                        <input type="text" id="sol-insumo" list="productos-sugeridos" placeholder="Producto">
-                        <datalist id="productos-sugeridos"></datalist>
-                        <input type="number" id="sol-cantidad" placeholder="Cantidad">
-                        <input type="text" id="sol-ubicacion" placeholder="Ubicación">
-                        <button onclick="procesarSolicitud()" class="btn-success">Enviar Pedido</button>
-                    </div>
-                </div>
-            </div>
+    <nav class="space-y-2">
+      <button class="menu-btn">📊 Dashboard</button>
+      <button class="menu-btn">📦 Inventario</button>
+      <button class="menu-btn">🧾 Pedidos</button>
+      <button class="menu-btn">📜 Historial</button>
+      <button class="menu-btn">👥 Usuarios</button>
+    </nav>
 
-            <div id="pag-pedidos" class="view">
-                <h2>Pedidos Pendientes</h2>
-                <div id="lista-pendientes-admin"></div>
-            </div>
+    <button class="mt-10 w-full bg-red-600 hover:bg-red-700 py-2 rounded-lg transition">
+      Cerrar sesión
+    </button>
+  </aside>
 
-            <div id="pag-historial" class="view">
-                <h2>Historial General</h2>
-                <div id="lista-historial-admin"></div>
-            </div>
+  <!-- CONTENT -->
+  <main class="flex-1 p-6 space-y-6">
 
-            <div id="pag-mis-pedidos" class="view">
-                <h2>Estado de mis Pedidos</h2>
-                <div id="lista-mis-pedidos"></div>
-            </div>
+    <!-- METRICS -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="metric-card">
+        <h4>Total productos</h4>
+        <p class="metric-number">128</p>
+      </div>
+      <div class="metric-card">
+        <h4>Stock disponible</h4>
+        <p class="metric-number">1,540</p>
+      </div>
+      <div class="metric-card">
+        <h4>Pedidos pendientes</h4>
+        <p class="metric-number text-yellow-400">7</p>
+      </div>
+    </section>
 
-            <div id="pag-ver-stock" class="view">
-                <h2>Stock Actual</h2>
-                <div id="lista-solo-lectura" class="grid-productos"></div>
-            </div>
+    <!-- CHARTS -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-            <div id="pag-usuarios" class="view">
-                <h2>Gestión de Usuarios</h2>
-                <div class="card glass">
-                    <div class="form-grid">
-                        <input type="text" id="new-user" placeholder="Nuevo Usuario">
-                        <input type="password" id="new-pass" placeholder="Contraseña">
-                        <select id="new-role">
-                            <option value="user">Usuario Estándar</option>
-                            <option value="admin">Administrador</option>
-                        </select>
-                        <button onclick="crearUsuario()" class="btn-primary">Crear Usuario</button>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
+      <div class="card">
+        <h3 class="card-title">Stock por producto</h3>
+        <canvas id="stockChart"></canvas>
+      </div>
 
-    <script type="module" src="app.js"></script>
+      <div class="card">
+        <h3 class="card-title">Estado de pedidos</h3>
+        <canvas id="pedidoChart"></canvas>
+      </div>
+
+    </section>
+
+    <!-- INVENTARIO TABLE -->
+    <section class="card">
+      <h3 class="card-title">Inventario</h3>
+
+      <table class="w-full text-sm mt-4">
+        <thead class="text-slate-400 border-b border-slate-700">
+          <tr>
+            <th class="text-left py-2">Producto</th>
+            <th class="text-left py-2">Cantidad</th>
+            <th class="text-center py-2">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800">
+          <tr class="hover:bg-slate-800 transition">
+            <td class="py-2">Guantes</td>
+            <td>200</td>
+            <td class="text-center">
+              <button class="text-red-500 hover:text-red-700">🗑</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+</div>
+
+<!-- COMPONENT STYLES -->
+<style>
+  .menu-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    text-align: left;
+    transition: background 0.2s;
+  }
+  .menu-btn:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  .metric-card {
+    background: linear-gradient(135deg, #1e293b, #020617);
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid #1e293b;
+  }
+  .metric-number {
+    font-size: 2rem;
+    font-weight: bold;
+  }
+  .card {
+    background: rgba(15,23,42,0.9);
+    border: 1px solid #1e293b;
+    border-radius: 18px;
+    padding: 20px;
+  }
+  .card-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+</style>
+
+<!-- CHARTS SCRIPT -->
+<script>
+  new Chart(document.getElementById('stockChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Guantes', 'Mascarillas', 'Alcohol', 'Jabón'],
+      datasets: [{
+        label: 'Cantidad',
+        data: [200, 500, 300, 180],
+        backgroundColor: '#3b82f6'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  new Chart(document.getElementById('pedidoChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Aprobados', 'Pendientes', 'Rechazados'],
+      datasets: [{
+        data: [12, 7, 3],
+        backgroundColor: ['#22c55e', '#eab308', '#ef4444']
+      }]
+    },
+    options: {
+      responsive: true
+    }
+  });
+</script>
+
 </body>
 </html>
