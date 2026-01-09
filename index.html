@@ -13,99 +13,92 @@
 
 <div id="pantalla-login" class="login-overlay z-50">
   <div class="glass login-card text-center">
-    <h1 class="text-2xl font-bold">📦 InsuManager</h1>
-    <p class="text-sm mb-6 text-slate-400">Panel de Control de Insumos</p>
+    <h1 class="text-3xl font-bold mb-2">📦 InsuManager</h1>
+    <p class="text-slate-400 mb-8 text-sm">Identifíquese para acceder al sistema</p>
     <div class="space-y-4">
-      <input id="login-user" type="text" placeholder="Usuario" class="bg-slate-800 border-slate-700">
-      <input id="login-pass" type="password" placeholder="Contraseña" class="bg-slate-800 border-slate-700">
-      <button onclick="iniciarSesion()" class="btn-primary w-full py-3 font-semibold">Entrar al Sistema</button>
+      <input id="login-user" type="text" placeholder="Usuario" class="w-full">
+      <input id="login-pass" type="password" placeholder="Contraseña" class="w-full">
+      <button onclick="iniciarSesion()" class="btn-primary w-full py-3 font-bold text-lg">Entrar</button>
     </div>
   </div>
 </div>
 
 <div id="interfaz-app" class="flex min-h-screen" style="display:none;">
-  <aside class="w-64 bg-slate-950 border-r border-slate-800 p-5 hidden md:flex flex-col">
-    <h1 class="text-xl font-bold mb-8">📦 InsuManager</h1>
-    <nav class="space-y-2 flex-1">
-      <button id="nav-admin" onclick="verPagina('admin')" class="menu-btn active">📊 Dashboard/Stock</button>
-      <button id="nav-pedidos" onclick="verPagina('pedidos')" class="menu-btn">🧾 Pendientes</button>
-      <button id="nav-historial" onclick="verPagina('historial')" class="menu-btn">📜 Historial</button>
-      <button id="nav-usuarios" onclick="verPagina('usuarios')" class="menu-btn">👥 Usuarios</button>
-      
-      <button id="nav-ver-stock" onclick="verPagina('ver-stock')" class="menu-btn">📦 Ver Stock</button>
-      <button id="nav-solicitar" onclick="verPagina('solicitar')" class="menu-btn">➕ Solicitar</button>
-      <button id="nav-mis-pedidos" onclick="verPagina('mis-pedidos')" class="menu-btn">⏳ Mis Pedidos</button>
+  <aside class="w-64 bg-slate-950 border-r border-slate-800 p-5 flex flex-col fixed h-full">
+    <h1 class="text-xl font-bold mb-10 text-indigo-400">📦 Dashboard</h1>
+    <nav class="space-y-2 flex-1 overflow-y-auto">
+      <div id="menu-admin" class="space-y-2 hidden">
+        <button onclick="verPagina('stats')" class="menu-btn"><i class="fas fa-chart-pie mr-2"></i> Estadísticas</button>
+        <button onclick="verPagina('admin-stock')" class="menu-btn"><i class="fas fa-boxes mr-2"></i> Gestionar Stock</button>
+        <button onclick="verPagina('solicitudes')" class="menu-btn"><i class="fas fa-bell mr-2"></i> Solicitudes</button>
+        <button onclick="verPagina('usuarios')" class="menu-btn"><i class="fas fa-users mr-2"></i> Usuarios</button>
+      </div>
+      <div id="menu-user" class="space-y-2 hidden">
+        <button onclick="verPagina('user-stock')" class="menu-btn"><i class="fas fa-eye mr-2"></i> Ver Stock</button>
+        <button onclick="verPagina('solicitar')" class="menu-btn"><i class="fas fa-plus mr-2"></i> Solicitar Insumo</button>
+        <button onclick="verPagina('mis-pedidos')" class="menu-btn"><i class="fas fa-history mr-2"></i> Mis Pedidos</button>
+      </div>
     </nav>
-    <button onclick="cerrarSesion()" class="btn-logout w-full py-2 rounded-lg mt-auto">Cerrar sesión</button>
+    <button onclick="cerrarSesion()" class="btn-logout w-full py-2 rounded-lg mt-5 text-sm font-bold">Cerrar sesión</button>
   </aside>
 
-  <main class="flex-1 p-6 space-y-6 overflow-y-auto">
-    
-    <section id="pag-admin" class="view space-y-6">
+  <main class="flex-1 ml-64 p-8 space-y-8">
+
+    <section id="pag-stats" class="view space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="metric-card"><h4 class="text-slate-400">Productos</h4><p id="metrica-total" class="metric-number">0</p></div>
-        <div class="metric-card"><h4 class="text-slate-400">Stock Total</h4><p id="metrica-stock" class="metric-number">0</p></div>
-        <div class="metric-card"><h4 class="text-slate-400">Pendientes</h4><p id="metrica-pedidos" class="metric-number text-yellow-400">0</p></div>
+        <div class="metric-card"><h4 class="text-slate-400 text-xs uppercase tracking-widest">Insumos Únicos</h4><p id="metrica-total" class="metric-number">0</p></div>
+        <div class="metric-card"><h4 class="text-slate-400 text-xs uppercase tracking-widest">Stock Global</h4><p id="metrica-stock" class="metric-number text-indigo-400">0</p></div>
+        <div class="metric-card"><h4 class="text-slate-400 text-xs uppercase tracking-widest">Alertas de Stock</h4><p id="metrica-alertas" class="metric-number text-red-500">0</p></div>
       </div>
-
-      <div class="card">
-        <h3 class="card-title text-indigo-400">Registrar Insumo</h3>
-        <div class="form-grid">
-          <input id="nombre" placeholder="Nombre del producto">
-          <input id="cantidad" type="number" placeholder="Cantidad">
-          <button onclick="agregarProducto()" class="btn-primary">Actualizar Stock</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="card-title">Inventario Actual</h3>
-        <div id="lista-inventario" class="grid-productos mt-4"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card"><h3 class="mb-4 font-bold">Niveles de Inventario</h3><canvas id="stockChart"></canvas></div>
+        <div class="card"><h3 class="mb-4 font-bold">Estado de Pedidos</h3><canvas id="pedidoChart"></canvas></div>
       </div>
     </section>
 
-    <section id="pag-pedidos" class="view hidden">
-      <h2 class="text-2xl font-bold">Solicitudes Pendientes</h2>
+    <section id="pag-admin-stock" class="view hidden space-y-6">
+      <div class="card">
+        <h3 class="card-title text-indigo-400">Agregar o Actualizar Insumo</h3>
+        <div class="form-grid mt-4">
+          <input id="nombre-prod" placeholder="Nombre (ej. Guantes)">
+          <input id="cantidad-prod" type="number" placeholder="Cantidad">
+          <button onclick="agregarProducto()" class="btn-primary">Actualizar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="mb-4 font-bold">Tabla de Inventario</h3>
+        <div id="lista-inventario" class="grid-productos"></div>
+      </div>
+    </section>
+
+    <section id="pag-solicitudes" class="view hidden">
+      <h2 class="text-2xl font-bold mb-6">Pedidos por Procesar</h2>
       <div id="lista-pendientes-admin" class="space-y-4"></div>
     </section>
 
-    <section id="pag-historial" class="view hidden">
-      <h2 class="text-2xl font-bold text-slate-400">Historial de Movimientos</h2>
-      <div id="lista-historial-admin" class="space-y-4 opacity-80"></div>
-    </section>
-
     <section id="pag-usuarios" class="view hidden">
-      <div class="card">
-        <h3 class="card-title text-indigo-400">Crear Nuevo Usuario</h3>
-        <div class="form-grid">
-          <input id="new-user" placeholder="Nombre de usuario">
+      <div class="card mb-6">
+        <h3 class="font-bold text-indigo-400">Registrar Nuevo Acceso</h3>
+        <div class="form-grid mt-4">
+          <input id="new-user" placeholder="Usuario">
           <input id="new-pass" type="password" placeholder="Contraseña">
-          <select id="new-role" class="bg-slate-800">
-            <option value="user">Rol: Usuario</option>
-            <option value="admin">Rol: Administrador</option>
-          </select>
-          <button onclick="crearUsuario()" class="btn-primary">Crear Cuenta</button>
+          <select id="new-role" class="bg-slate-800 rounded-lg p-2 border border-slate-700"><option value="user">Usuario</option><option value="admin">Admin</option></select>
+          <button onclick="crearUsuario()" class="btn-primary">Crear</button>
         </div>
       </div>
-      <div id="lista-usuarios-db" class="mt-6 space-y-2"></div>
-    </section>
-
-    <section id="pag-ver-stock" class="view hidden">
-      <h2 class="text-2xl font-bold mb-6">Insumos Disponibles</h2>
-      <div id="lista-solo-lectura" class="grid-productos"></div>
+      <div id="lista-usuarios-db" class="space-y-2"></div>
     </section>
 
     <section id="pag-solicitar" class="view hidden">
-      <div class="card max-w-2xl mx-auto">
-        <h2 class="text-2xl font-bold mb-6 text-indigo-400">Formulario de Solicitud</h2>
+      <div class="card max-w-xl mx-auto glass">
+        <h2 class="text-xl font-bold mb-6 border-b border-slate-700 pb-2">Formulario de Pedido</h2>
         <div class="space-y-4">
-          <input id="sol-usuario" readonly class="opacity-50 cursor-not-allowed">
-          <input id="sol-ubicacion" placeholder="Sede o Departamento">
-          <div class="flex gap-4">
-            <input id="sol-insumo" placeholder="¿Qué necesitas?" list="productos-sugeridos" class="flex-1">
-            <datalist id="productos-sugeridos"></datalist>
-            <input id="sol-cantidad" type="number" placeholder="Cant." class="w-32">
-          </div>
-          <button onclick="procesarSolicitud()" class="btn-success w-full text-white py-4 text-lg">Enviar Solicitud</button>
+          <input id="sol-usuario" readonly class="opacity-50">
+          <input id="sol-ubicacion" placeholder="Departamento/Sede">
+          <input id="sol-insumo" placeholder="Producto que necesita" list="productos-sugeridos">
+          <datalist id="productos-sugeridos"></datalist>
+          <input id="sol-cantidad" type="number" placeholder="Cantidad">
+          <button onclick="procesarSolicitud()" class="btn-success w-full text-white py-4 rounded-xl font-bold">Enviar Solicitud</button>
         </div>
       </div>
     </section>
@@ -113,6 +106,11 @@
     <section id="pag-mis-pedidos" class="view hidden">
       <h2 class="text-2xl font-bold mb-6">Estado de mis Solicitudes</h2>
       <div id="lista-mis-pedidos" class="space-y-4"></div>
+    </section>
+
+    <section id="pag-user-stock" class="view hidden">
+      <h2 class="text-2xl font-bold mb-6">Consulta de Stock Disponible</h2>
+      <div id="lista-solo-lectura" class="grid-productos"></div>
     </section>
 
   </main>
