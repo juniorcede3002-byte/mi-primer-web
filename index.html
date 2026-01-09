@@ -3,84 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InsuManager | Sistema de Gestión</title>
+    <title>InsuManager | Pro</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <div id="pantalla-login" class="login-overlay">
         <div class="login-card glass">
             <h1>InsuManager</h1>
-            <p>Ingresa tus credenciales</p>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
-                <input type="text" id="login-user" placeholder="Usuario">
-                <input type="password" id="login-pass" placeholder="Contraseña">
-                <button onclick="iniciarSesion()" class="btn-primary">Entrar al Sistema</button>
-            </div>
+            <p>Gestión de Insumos y Pedidos</p>
+            <input type="text" id="login-user" placeholder="Usuario">
+            <input type="password" id="login-pass" placeholder="Contraseña">
+            <button onclick="iniciarSesion()" class="btn-primary" style="width:100%; margin-top:10px;">Entrar</button>
         </div>
     </div>
 
     <div id="interfaz-app" style="display: none;">
         <aside class="sidebar glass">
             <div class="brand">📦 InsuManager</div>
-            
-            <nav id="menu-navegacion" class="flex-grow">
-                <button id="nav-admin" onclick="verPagina('admin')">🏠 Dashboard</button>
-                <button id="nav-pedidos" onclick="verPagina('pedidos')">📋 Pedidos Pendientes</button>
+            <nav id="menu">
+                <button id="nav-admin" onclick="verPagina('admin')">🏠 Inventario</button>
+                <button id="nav-pedidos" onclick="verPagina('pedidos')">⏳ Pedidos</button>
                 <button id="nav-historial" onclick="verPagina('historial')">🕒 Historial</button>
-                <button id="nav-ver-stock" onclick="verPagina('ver-stock')">📦 Ver Stock</button>
-                <button id="nav-solicitar" onclick="verPagina('solicitar')">✍️ Solicitar Insumo</button>
                 <button id="nav-usuarios" onclick="verPagina('usuarios')">👥 Usuarios</button>
+                <hr style="opacity: 0.1; margin: 10px 0;">
+                <button id="nav-ver-stock" onclick="verPagina('ver-stock')">👁️ Ver Stock</button>
+                <button id="nav-solicitar" onclick="verPagina('solicitar')">✍️ Solicitar</button>
+                <button id="nav-mis-pedidos" onclick="verPagina('mis-pedidos')">📦 Mis Pedidos</button>
             </nav>
-
-            <button class="btn-logout" onclick="cerrarSesion()">Salir del Sistema</button>
+            <button class="btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
         </aside>
 
         <main class="content">
             <div id="pag-admin" class="view">
-                <h2>Gestión de Inventario</h2>
-                <div class="card glass interactive">
-                    <h3>➕ Agregar Nuevo Producto</h3>
-                    <div class="form-grid mt-4">
-                        <input type="text" id="nombre" placeholder="Nombre del insumo">
-                        <input type="number" id="cantidad" placeholder="Cantidad inicial">
-                        <button onclick="agregarProducto()" class="btn-primary">Guardar Producto</button>
+                <h2>Panel de Inventario</h2>
+                <div class="card glass">
+                    <div class="form-grid">
+                        <input type="text" id="nombre" placeholder="Nombre producto">
+                        <input type="number" id="cantidad" placeholder="Cantidad">
+                        <button onclick="agregarProducto()" class="btn-primary">Guardar</button>
                     </div>
                 </div>
-                <div id="lista-inventario" class="grid-productos">
-                    </div>
+                <div id="lista-inventario" class="grid-productos"></div>
             </div>
 
             <div id="pag-solicitar" class="view">
-                <h2>Realizar Solicitud</h2>
+                <h2>Nueva Solicitud</h2>
                 <div class="card glass">
                     <div class="form-grid">
-                        <input type="text" id="sol-usuario" readonly>
-                        <input type="text" id="sol-insumo" list="productos-sugeridos" placeholder="¿Qué necesitas?">
+                        <input type="text" id="sol-usuario" readonly class="muted">
+                        <input type="text" id="sol-insumo" list="productos-sugeridos" placeholder="Producto">
                         <datalist id="productos-sugeridos"></datalist>
                         <input type="number" id="sol-cantidad" placeholder="Cantidad">
-                        <input type="text" id="sol-ubicacion" placeholder="Ubicación/Destino">
-                        <button onclick="procesarSolicitud()" class="btn-success">Enviar Solicitud</button>
+                        <input type="text" id="sol-ubicacion" placeholder="Ubicación">
+                        <button onclick="procesarSolicitud()" class="btn-success">Enviar Pedido</button>
                     </div>
                 </div>
             </div>
 
             <div id="pag-pedidos" class="view">
-                <h2>Pedidos por Aprobar</h2>
+                <h2>Pedidos Pendientes</h2>
                 <div id="lista-pendientes-admin"></div>
             </div>
 
             <div id="pag-historial" class="view">
-                <h2>Historial de Movimientos</h2>
+                <h2>Historial General</h2>
                 <div id="lista-historial-admin"></div>
             </div>
-            
+
+            <div id="pag-mis-pedidos" class="view">
+                <h2>Estado de mis Pedidos</h2>
+                <div id="lista-mis-pedidos"></div>
+            </div>
+
             <div id="pag-ver-stock" class="view">
-                <h2>Inventario Disponible</h2>
+                <h2>Stock Actual</h2>
                 <div id="lista-solo-lectura" class="grid-productos"></div>
             </div>
 
+            <div id="pag-usuarios" class="view">
+                <h2>Gestión de Usuarios</h2>
+                <div class="card glass">
+                    <div class="form-grid">
+                        <input type="text" id="new-user" placeholder="Nuevo Usuario">
+                        <input type="password" id="new-pass" placeholder="Contraseña">
+                        <select id="new-role">
+                            <option value="user">Usuario Estándar</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                        <button onclick="crearUsuario()" class="btn-primary">Crear Usuario</button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
