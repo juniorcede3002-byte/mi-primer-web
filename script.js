@@ -12,7 +12,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
 const lista = document.getElementById("lista");
+const sugerencias = document.getElementById("productos-sugeridos");
 
 // --- FUNCIONES ---
 
@@ -24,15 +26,17 @@ window.agregarProducto = async () => {
   const nombre = nombreInput.value.trim().toLowerCase(); 
   const cantidad = parseInt(cantidadInput.value);
 
-  if (!nombre || isNaN(cantidad)) return alert("Llena los campos correctamente");
+  if (!nombre || isNaN(cantidad)) return alert("Ingresa nombre y cantidad válida");
 
   const docRef = doc(db, "inventario", nombre);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
+    // Suma a lo existente
     const nuevaCantidad = docSnap.data().cantidad + cantidad;
     await updateDoc(docRef, { cantidad: nuevaCantidad });
   } else {
+    // Crea nuevo
     await setDoc(docRef, { nombre, cantidad });
   }
 
@@ -42,41 +46,52 @@ window.agregarProducto = async () => {
 
 // 3. ELIMINAR PRODUCTO
 window.eliminarProducto = async (id) => {
-  if(confirm("¿Eliminar este producto?")) {
+  if(confirm(`¿Seguro que quieres borrar "${id.toUpperCase()}"?`)) {
     await deleteDoc(doc(db, "inventario", id));
   }
 };
 
-// 4. RESTAR CANTIDAD (Botón -)
+// 4. RESTAR CANTIDAD
 window.restarUno = async (id, cantidadActual) => {
   const docRef = doc(db, "inventario", id);
   if (cantidadActual > 0) {
     await updateDoc(docRef, { cantidad: cantidadActual - 1 });
+  } else {
+    window.eliminarProducto(id);
   }
 };
 
-// 5. SUMAR CANTIDAD (Botón +)
+// 5. SUMAR CANTIDAD
 window.sumarUno = async (id, cantidadActual) => {
   const docRef = doc(db, "inventario", id);
   await updateDoc(docRef, { cantidad: cantidadActual + 1 });
 };
 
-// 6. ESCUCHAR CAMBIOS EN TIEMPO REAL
+// 6. ESCUCHAR CAMBIOS Y ACTUALIZAR LISTA + SUGERENCIAS
 onSnapshot(collection(db, "inventario"), (querySnapshot) => {
   lista.innerHTML = "";
+  sugerencias.innerHTML = ""; 
+
   querySnapshot.forEach((doc) => {
     const p = doc.data();
     const id = doc.id;
     
+    // Llenar Lista Visual
     lista.innerHTML += `
       <li>
-        <strong>${p.nombre.toUpperCase()}</strong>: ${p.cantidad} unidades
+        <div>
+          <strong style="text-transform: uppercase;">${p.nombre}</strong><br>
+          <span style="color: #666;">${p.cantidad} unidades</span>
+        </div>
         <div class="controles">
           <button onclick="sumarUno('${id}', ${p.cantidad})">+</button>
           <button onclick="restarUno('${id}', ${p.cantidad})">-</button>
-          <button class="btn-eliminar" onclick="eliminarProducto('${id}')">Borrar</button>
+          <button class="btn-eliminar" onclick="eliminarProducto('${id}')">🗑️</button>
         </div>
       </li>
     `;
+
+    // Llenar Datalist de Sugerencias
+    sugerencias.innerHTML += `<option value="${p.nombre}">`;
   });
 });

@@ -9,19 +9,17 @@
 <body>
 
   <div class="container">
-    <h1>📦 Control de Inventario</h1>
+    <h1>📦 Inventario Inteligente</h1>
 
     <div class="formulario">
-      <input id="nombre" type="text" placeholder="Nombre del producto">
-      <input id="cantidad" type="number" placeholder="Cantidad">
-      <button onclick="agregarProducto()" class="btn-principal">Agregar / Actualizar</button>
+      <input id="nombre" placeholder="Nombre del producto" list="productos-sugeridos" autocomplete="off">
+      <datalist id="productos-sugeridos"></datalist>
+      
+      <input id="cantidad" type="number" placeholder="Cant.">
+      <button class="btn-principal" onclick="agregarProducto()">Agregar / Sumar</button>
     </div>
 
-    <hr>
-
-    <h3>Lista de Productos</h3>
-    <ul id="lista">
-      </ul>
+    <ul id="lista"></ul>
   </div>
 
   <script type="module" src="script.js"></script>
