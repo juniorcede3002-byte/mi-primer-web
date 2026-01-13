@@ -65,7 +65,7 @@ window.toggleMenu = () => {
     document.getElementById("sidebar-overlay").classList.toggle("hidden");
 };
 
-// --- CORREOS (Sincronizado con vvoz2ae) ---
+// --- CORREOS ---
 async function enviarMail(emailDest, info) {
     if(!emailDest) return;
     emailjs.send("default_service", "vvoz2ae", {
@@ -92,6 +92,8 @@ window.procesarSolicitud = async () => {
         });
         enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "NUEVO", ubicacion: ubi });
         alert("Enviado");
+        document.getElementById("sol-insumo").value = "";
+        document.getElementById("sol-cantidad").value = "";
         verPagina('notificaciones');
     }
 };
@@ -109,7 +111,7 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
             await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
             await updateDoc(pRef, { estado: "aprobado" });
             enviarMail(uMail, { usuario: pData.usuarioId, insumo: ins, cantidad: cant, estado: "APROBADO", ubicacion: pData.ubicacion });
-        } else { alert("Sin stock"); }
+        } else { alert("Sin stock suficiente en inventario"); }
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
         enviarMail(uMail, { usuario: pData.usuarioId, insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
@@ -118,17 +120,36 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
 
 // --- SINCRONIZACIÓN TIEMPO REAL ---
 function activarSincronizacion() {
-    // Inventario
+    // Inventario + Datalists
     onSnapshot(collection(db, "inventario"), snap => {
         const list = document.getElementById("lista-inventario");
-        let lbs = [], vls = [], tot = 0; list.innerHTML = "";
+        const dlInsumos = document.getElementById("datalist-insumos");
+        const dlAdminStock = document.getElementById("datalist-admin-stock");
+        
+        let lbs = [], vls = [], tot = 0; 
+        list.innerHTML = "";
+        if(dlInsumos) dlInsumos.innerHTML = "";
+        if(dlAdminStock) dlAdminStock.innerHTML = "";
+
         snap.forEach(d => {
-            const p = d.data(); tot += p.cantidad; lbs.push(d.id.toUpperCase()); vls.push(p.cantidad);
+            const p = d.data(); 
+            const nombre = d.id;
+            tot += p.cantidad; 
+            lbs.push(nombre.toUpperCase()); 
+            vls.push(p.cantidad);
+
+            // Lista visual
             list.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm">
-                <div><b class="uppercase">${d.id}</b><p class="text-xs text-slate-400 font-bold">Existencia: ${p.cantidad}</p></div>
-                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${d.id}')" class="text-red-400 p-2"><i class="fas fa-trash"></i></button>` : ''}
+                <div><b class="uppercase">${nombre}</b><p class="text-xs text-slate-400 font-bold">Existencia: ${p.cantidad}</p></div>
+                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${nombre}')" class="text-red-400 p-2"><i class="fas fa-trash"></i></button>` : ''}
             </div>`;
+
+            // Llenar sugerencias (Datalists)
+            const option = `<option value="${nombre}">`;
+            if(dlInsumos) dlInsumos.innerHTML += option;
+            if(dlAdminStock) dlAdminStock.innerHTML += option;
         });
+
         if(usuarioActual.rol === 'admin') {
             document.getElementById("metrica-total").innerText = snap.size;
             document.getElementById("metrica-stock").innerText = tot;
@@ -141,14 +162,17 @@ function activarSincronizacion() {
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
         const tHist = document.getElementById("tabla-historial-body");
-        let pCnt = 0; if(lAdmin) lAdmin.innerHTML = ""; if(lUser) lUser.innerHTML = ""; if(tHist) tHist.innerHTML = "";
+        let pCnt = 0; 
+        if(lAdmin) lAdmin.innerHTML = ""; 
+        if(lUser) lUser.innerHTML = ""; 
+        if(tHist) tHist.innerHTML = "";
 
         snap.forEach(d => {
             const p = d.data();
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 pCnt++;
                 lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center">
-                    <div><b>${p.insumoNom}</b> (x${p.cantidad})<br><small>${p.usuarioId}</small></div>
+                    <div><b>${p.insumoNom}</b> (x${p.cantidad})<br><small>${p.usuarioId} - ${p.ubicacion}</small></div>
                     <div class="flex gap-2">
                         <button onclick="gestionarPedido('${d.id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Aprobar</button>
                         <button onclick="gestionarPedido('${d.id}','rechazar','${p.insumoNom}',${p.cantidad})" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">X</button>
@@ -186,14 +210,21 @@ window.crearUsuario = async () => {
     if(id && pass && email) {
         await setDoc(doc(db, "usuarios", id), { pass, email, rol });
         alert("Usuario Creado");
+        document.getElementById("new-user").value = "";
+        document.getElementById("new-pass").value = "";
+        document.getElementById("new-email").value = "";
     }
 };
 
 window.agregarProducto = async () => {
     const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
     const c = parseInt(document.getElementById("cantidad-prod").value);
-    if(n && !isNaN(c)) await setDoc(doc(db, "inventario", n), { cantidad: c });
-    cerrarModalInsumo();
+    if(n && !isNaN(c)) {
+        await setDoc(doc(db, "inventario", n), { cantidad: c });
+        cerrarModalInsumo();
+        document.getElementById("nombre-prod").value = "";
+        document.getElementById("cantidad-prod").value = "";
+    }
 };
 
 window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, col, id)); };
