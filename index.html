@@ -15,7 +15,7 @@
     <div id="pantalla-login" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-6">
         <div class="w-full max-w-sm text-center">
             <div class="text-6xl mb-4">📦</div>
-            <h1 class="text-3xl font-bold mb-8 text-indigo-900">FCI System</h1>
+            <h1 class="text-3xl font-bold mb-8 text-indigo-900">FCILog System</h1>
             <div class="space-y-4">
                 <input id="login-user" type="text" placeholder="Usuario ID" class="input-light">
                 <input id="login-pass" type="password" placeholder="Contraseña" class="input-light">
@@ -57,7 +57,7 @@
                 <section id="pag-stock" class="view hidden space-y-6">
                     <div class="flex justify-between items-center">
                         <h2 class="text-2xl font-bold">Stock Actual</h2>
-                        <button id="btn-admin-stock" onclick="abrirModalInsumo()" class="hidden bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg">+ Agregar Insumo</button>
+                        <button id="btn-admin-stock" onclick="abrirModalInsumo()" class="hidden bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg">+ Agregar/Sumar Stock</button>
                     </div>
                     <div id="lista-inventario" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                 </section>
@@ -68,15 +68,16 @@
                 </section>
 
                 <section id="pag-historial" class="view hidden space-y-4">
-                    <h2 class="text-2xl font-bold">Historial</h2>
+                    <h2 class="text-2xl font-bold">Historial de Movimientos</h2>
                     <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto">
-                        <table class="w-full text-left min-w-[600px]">
+                        <table class="w-full text-left min-w-[700px]">
                             <thead class="bg-slate-50 border-b">
                                 <tr>
                                     <th class="p-4 text-xs font-bold text-slate-500 uppercase">Fecha</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Usuario</th>
                                     <th class="p-4 text-xs font-bold text-slate-500 uppercase">Insumo</th>
                                     <th class="p-4 text-xs font-bold text-slate-500 uppercase">Cant.</th>
+                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase text-indigo-600">Destino</th>
+                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Solicitante</th>
                                     <th class="p-4 text-xs font-bold text-slate-500 uppercase">Estado</th>
                                 </tr>
                             </thead>
@@ -87,9 +88,9 @@
 
                 <section id="pag-usuarios" class="view hidden space-y-6">
                     <div class="bg-white p-6 rounded-3xl border shadow-sm">
-                        <h3 class="font-bold mb-4">Crear Usuario</h3>
+                        <h3 class="font-bold mb-4">Crear Nuevo Acceso</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                            <input id="new-user" placeholder="ID" class="input-light">
+                            <input id="new-user" placeholder="ID Usuario" class="input-light">
                             <input id="new-pass" type="password" placeholder="Clave" class="input-light">
                             <input id="new-email" type="email" placeholder="Correo" class="input-light">
                             <select id="new-role" class="input-light">
@@ -106,18 +107,18 @@
                     <div class="bg-white p-8 rounded-[2.5rem] border shadow-sm text-center">
                         <h2 class="text-2xl font-bold mb-6">Nueva Solicitud</h2>
                         <div class="space-y-4">
-                            <input id="sol-ubicacion" placeholder="Área Destino" class="input-light">
+                            <input id="sol-ubicacion" placeholder="Área Destino (Ej: Cocina, Oficina)" class="input-light">
                             <select id="sol-insumo" class="input-light">
-                                <option value="">Cargando insumos...</option>
+                                <option value="">Seleccionar Insumo...</option>
                             </select>
                             <input id="sol-cantidad" type="number" placeholder="Cantidad" class="input-light">
-                            <button onclick="procesarSolicitud()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">Enviar</button>
+                            <button onclick="procesarSolicitud()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg">Enviar Solicitud</button>
                         </div>
                     </div>
                 </section>
 
                 <section id="pag-notificaciones" class="view hidden space-y-4">
-                    <h2 class="text-2xl font-bold">Mis Pedidos</h2>
+                    <h2 class="text-2xl font-bold">Estado de mis Pedidos</h2>
                     <div id="lista-notificaciones" class="space-y-3"></div>
                 </section>
             </main>
@@ -125,14 +126,15 @@
     </div>
 
     <div id="modal-insumo" class="fixed inset-0 bg-slate-900/60 hidden z-[250] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm">
-            <h3 class="text-xl font-bold mb-6 text-center">Gestionar Stock</h3>
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl">
+            <h3 class="text-xl font-bold mb-6 text-center text-indigo-900">Actualizar Inventario</h3>
+            <p class="text-xs text-slate-400 mb-4 text-center">Si el insumo ya existe, la cantidad se sumará a la actual.</p>
             <div class="space-y-4">
-                <input id="nombre-prod" list="admin-stock-dl" placeholder="Nombre Item" class="input-light">
+                <input id="nombre-prod" list="admin-stock-dl" placeholder="Nombre del Insumo" class="input-light">
                 <datalist id="admin-stock-dl"></datalist>
-                <input id="cantidad-prod" type="number" placeholder="Nueva Cantidad" class="input-light">
-                <button onclick="agregarProducto()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">Guardar</button>
-                <button onclick="cerrarModalInsumo()" class="w-full py-3 bg-slate-100 rounded-xl font-bold">Cancelar</button>
+                <input id="cantidad-prod" type="number" placeholder="Cantidad a sumar" class="input-light">
+                <button onclick="agregarProducto()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">Guardar Cambios</button>
+                <button onclick="cerrarModalInsumo()" class="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold">Cancelar</button>
             </div>
         </div>
     </div>
