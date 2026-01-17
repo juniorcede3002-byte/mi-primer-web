@@ -108,8 +108,9 @@
                         <h2 class="text-2xl font-bold mb-6">Nueva Solicitud</h2>
                         <div class="space-y-4">
                             <input id="sol-ubicacion" placeholder="Área Destino" class="input-light">
-                            <input id="sol-insumo" list="datalist-insumos" placeholder="Insumo" class="input-light">
-                            <datalist id="datalist-insumos"></datalist>
+                            <select id="sol-insumo" class="input-light">
+                                <option value="">Seleccionar Insumo...</option>
+                            </select>
                             <input id="sol-cantidad" type="number" placeholder="Cantidad" class="input-light">
                             <button onclick="procesarSolicitud()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold">Enviar</button>
                         </div>
@@ -129,8 +130,8 @@
         <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm">
             <h3 class="text-xl font-bold mb-6 text-center">Actualizar Inventario</h3>
             <div class="space-y-4">
-                <input id="nombre-prod" list="datalist-admin-stock" placeholder="Nombre Item" class="input-light">
-                <datalist id="datalist-admin-stock"></datalist>
+                <input id="nombre-prod" list="admin-sugerencias" placeholder="Nombre Item" class="input-light">
+                <datalist id="admin-sugerencias"></datalist>
                 <input id="cantidad-prod" type="number" placeholder="Stock" class="input-light">
                 <button onclick="agregarProducto()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">Guardar</button>
                 <button onclick="cerrarModalInsumo()" class="w-full py-3 bg-slate-100 rounded-xl font-bold">Cancelar</button>
