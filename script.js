@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+// CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -15,7 +16,8 @@ let stockChart = null;
 
 emailjs.init("2jVnfkJKKG0bpKN-U"); 
 
-// --- AUTENTICACIÓN ---
+// --- EXPORTACIÓN A WINDOW (PARA ONCLICK HTML) ---
+
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
     const pass = document.getElementById("login-pass").value.trim();
@@ -30,17 +32,99 @@ window.iniciarSesion = async () => {
     }
 };
 
+window.verPagina = (id) => {
+    document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
+    const target = document.getElementById(`pag-${id}`);
+    if(target) target.classList.remove("hidden");
+    if(window.innerWidth < 1024) {
+        document.getElementById("sidebar").classList.add("-translate-x-full");
+        document.getElementById("sidebar-overlay").classList.add("hidden");
+    }
+};
+
+window.toggleMenu = () => {
+    document.getElementById("sidebar").classList.toggle("-translate-x-full");
+    document.getElementById("sidebar-overlay").classList.toggle("hidden");
+};
+
+window.cerrarSesion = () => location.reload();
+
+window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
+window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
+
+window.procesarSolicitud = async () => {
+    const ins = document.getElementById("sol-insumo").value;
+    const cant = parseInt(document.getElementById("sol-cantidad").value);
+    const ubi = document.getElementById("sol-ubicacion").value.trim();
+
+    if(!ins || isNaN(cant) || cant <= 0) return alert("Completa los datos correctamente.");
+
+    await addDoc(collection(db, "pedidos"), {
+        usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant,
+        ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString()
+    });
+    
+    enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "NUEVA SOLICITUD", ubicacion: ubi });
+    alert("Solicitud Enviada");
+    document.getElementById("sol-cantidad").value = "";
+    window.verPagina('notificaciones');
+};
+
+window.gestionarPedido = async (pid, accion, ins, cant) => {
+    const pRef = doc(db, "pedidos", pid);
+    const uSnap = await getDoc(doc(db, "usuarios", (await getDoc(pRef)).data().usuarioId));
+    const uMail = uSnap.exists() ? uSnap.data().email : "";
+
+    if(accion === 'aprobar') {
+        const iRef = doc(db, "inventario", ins.toLowerCase());
+        const iSnap = await getDoc(iRef);
+        if(iSnap.exists() && iSnap.data().cantidad >= cant) {
+            await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
+            await updateDoc(pRef, { estado: "aprobado" });
+            enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "APROBADO" });
+        } else { alert("No hay stock suficiente."); }
+    } else {
+        await updateDoc(pRef, { estado: "rechazado" });
+        enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "RECHAZADO" });
+    }
+};
+
+window.agregarProducto = async () => {
+    const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
+    const c = parseInt(document.getElementById("cantidad-prod").value);
+    if(n && !isNaN(c)) {
+        await setDoc(doc(db, "inventario", n), { cantidad: c });
+        window.cerrarModalInsumo();
+    }
+};
+
+window.crearUsuario = async () => {
+    const id = document.getElementById("new-user").value.trim().toLowerCase();
+    const pass = document.getElementById("new-pass").value.trim();
+    const email = document.getElementById("new-email").value.trim();
+    const rol = document.getElementById("new-role").value;
+    if(id && pass) {
+        await setDoc(doc(db, "usuarios", id), { pass, email, rol });
+        alert("Usuario guardado");
+        document.getElementById("new-user").value = "";
+    }
+};
+
+window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar registro?")) await deleteDoc(doc(db, col, id)); };
+
+// --- LÓGICA INTERNA ---
+
 function cargarSesion(datos) {
     usuarioActual = datos;
     document.getElementById("pantalla-login").classList.add("hidden");
     document.getElementById("interfaz-app").classList.remove("hidden");
     if(datos.rol === 'admin') document.getElementById("btn-admin-stock").classList.remove("hidden");
+    
     configurarMenu();
-    verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
+    window.verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
     activarSincronizacion();
 }
 
-// --- NAVEGACIÓN ---
 function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
     const isAdmin = usuarioActual.rol === 'admin';
@@ -54,111 +138,29 @@ function configurarMenu() {
         </button>`).join('');
 }
 
-window.verPagina = (id) => {
-    document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
-    document.getElementById(`pag-${id}`).classList.remove("hidden");
-    if(window.innerWidth < 1024 && document.getElementById("sidebar").classList.contains("translate-x-0")) toggleMenu();
-};
-
-window.toggleMenu = () => {
-    document.getElementById("sidebar").classList.toggle("-translate-x-full");
-    document.getElementById("sidebar-overlay").classList.toggle("hidden");
-};
-
-// --- CORREOS ---
-async function enviarMail(emailDest, info) {
-    if(!emailDest) return;
-    emailjs.send("default_service", "vvoz2ae", {
-        destinatario: emailDest,
-        usuario: info.usuario,
-        insumo: info.insumo,
-        cantidad: info.cantidad,
-        estado: info.estado,
-        ubicacion: info.ubicacion || "Bodega",
-        name: "FCILog Admin"
-    });
-}
-
-// --- SOLICITUDES ---
-window.procesarSolicitud = async () => {
-    const ins = document.getElementById("sol-insumo").value; // Toma valor del select
-    const cant = parseInt(document.getElementById("sol-cantidad").value);
-    const ubi = document.getElementById("sol-ubicacion").value.trim();
-
-    if(!ins) return alert("Por favor seleccione un insumo de la lista.");
-
-    if(ins && cant > 0) {
-        await addDoc(collection(db, "pedidos"), {
-            usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant,
-            ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString()
-        });
-        enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "NUEVO", ubicacion: ubi });
-        alert("Solicitud Enviada");
-        document.getElementById("sol-cantidad").value = "";
-        verPagina('notificaciones');
-    }
-};
-
-window.gestionarPedido = async (pid, accion, ins, cant) => {
-    const pRef = doc(db, "pedidos", pid);
-    const pData = (await getDoc(pRef)).data();
-    const uSnap = await getDoc(doc(db, "usuarios", pData.usuarioId));
-    const uMail = uSnap.exists() ? uSnap.data().email : "";
-
-    if(accion === 'aprobar') {
-        const iRef = doc(db, "inventario", ins.toLowerCase());
-        const iSnap = await getDoc(iRef);
-        if(iSnap.exists() && iSnap.data().cantidad >= cant) {
-            await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
-            await updateDoc(pRef, { estado: "aprobado" });
-            enviarMail(uMail, { usuario: pData.usuarioId, insumo: ins, cantidad: cant, estado: "APROBADO", ubicacion: pData.ubicacion });
-        } else { alert("Stock insuficiente para esta aprobación"); }
-    } else {
-        await updateDoc(pRef, { estado: "rechazado" });
-        enviarMail(uMail, { usuario: pData.usuarioId, insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
-    }
-};
-
-// --- SINCRONIZACIÓN TIEMPO REAL ---
 function activarSincronizacion() {
-    // Sincronizar Inventario y Listas Desplegables
+    // Inventario y Selectores
     onSnapshot(collection(db, "inventario"), snap => {
         const list = document.getElementById("lista-inventario");
-        const selectSolicitud = document.getElementById("sol-insumo");
-        const adminDataList = document.getElementById("admin-stock-datalist");
-
-        let lbs = [], vls = [], tot = 0; 
-        list.innerHTML = "";
+        const sel = document.getElementById("sol-insumo");
+        const dl = document.getElementById("admin-stock-dl");
         
-        // Limpiar select y datalist
-        if(selectSolicitud) selectSolicitud.innerHTML = '<option value="">Seleccionar Insumo...</option>';
-        if(adminDataList) adminDataList.innerHTML = '';
+        let lbs = [], vls = [], tot = 0;
+        list.innerHTML = "";
+        if(sel) sel.innerHTML = '<option value="">Seleccionar Insumo...</option>';
+        if(dl) dl.innerHTML = '';
 
         snap.forEach(d => {
-            const p = d.data(); 
-            const nombre = d.id;
-            tot += p.cantidad; 
-            lbs.push(nombre.toUpperCase()); 
-            vls.push(p.cantidad);
+            const p = d.data(); const n = d.id;
+            tot += p.cantidad; lbs.push(n.toUpperCase()); vls.push(p.cantidad);
 
-            // Renderizado en Stock Principal
             list.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm">
-                <div><b class="uppercase">${nombre}</b><p class="text-xs text-slate-400 font-bold">Existencia: ${p.cantidad}</p></div>
-                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${nombre}')" class="text-red-400 p-2"><i class="fas fa-trash"></i></button>` : ''}
+                <div><b class="uppercase">${n}</b><p class="text-xs text-slate-400 font-bold">Stock: ${p.cantidad}</p></div>
+                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${n}')" class="text-red-400"><i class="fas fa-trash"></i></button>` : ''}
             </div>`;
 
-            // Llenar SELECT de Solicitante (CELULAR/PC)
-            if(selectSolicitud) {
-                const opt = document.createElement("option");
-                opt.value = nombre;
-                opt.textContent = nombre.toUpperCase();
-                selectSolicitud.appendChild(opt);
-            }
-
-            // Llenar DATALIST de Administrador
-            if(adminDataList) {
-                adminDataList.innerHTML += `<option value="${nombre}">`;
-            }
+            if(sel) sel.innerHTML += `<option value="${n}">${n.toUpperCase()}</option>`;
+            if(dl) dl.innerHTML += `<option value="${n}">`;
         });
 
         if(usuarioActual.rol === 'admin') {
@@ -168,22 +170,20 @@ function activarSincronizacion() {
         }
     });
 
-    // Pedidos e Historial
+    // Pedidos
     onSnapshot(collection(db, "pedidos"), snap => {
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
         const tHist = document.getElementById("tabla-historial-body");
-        let pCnt = 0; 
-        if(lAdmin) lAdmin.innerHTML = ""; 
-        if(lUser) lUser.innerHTML = ""; 
-        if(tHist) tHist.innerHTML = "";
+        let pCnt = 0;
+        if(lAdmin) lAdmin.innerHTML = ""; if(lUser) lUser.innerHTML = ""; if(tHist) tHist.innerHTML = "";
 
         snap.forEach(d => {
             const p = d.data();
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 pCnt++;
                 lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center">
-                    <div><b>${p.insumoNom}</b> (x${p.cantidad})<br><small>${p.usuarioId} - ${p.ubicacion}</small></div>
+                    <div><b>${p.insumoNom}</b> (x${p.cantidad})<br><small>${p.usuarioId}</small></div>
                     <div class="flex gap-2">
                         <button onclick="gestionarPedido('${d.id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Aprobar</button>
                         <button onclick="gestionarPedido('${d.id}','rechazar','${p.insumoNom}',${p.cantidad})" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">X</button>
@@ -200,48 +200,22 @@ function activarSincronizacion() {
         if(usuarioActual.rol === 'admin') document.getElementById("metrica-pedidos").innerText = pCnt;
     });
 
-    // Usuarios
+    // Usuarios (solo admin)
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "usuarios"), snap => {
-            const list = document.getElementById("lista-usuarios-db"); list.innerHTML = "";
+            const list = document.getElementById("lista-usuarios-db"); if(!list) return;
+            list.innerHTML = "";
             snap.forEach(d => {
-                const u = d.data();
-                list.innerHTML += `<div class="user-card flex justify-between items-center"><div><b>${d.id}</b><br><small class="text-slate-400">${u.email || 'Sin mail'}</small></div><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`;
+                list.innerHTML += `<div class="user-card flex justify-between items-center"><div><b>${d.id}</b><br><small>${d.data().rol}</small></div><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`;
             });
         });
     }
 }
 
-// --- UTILIDADES ---
-window.crearUsuario = async () => {
-    const id = document.getElementById("new-user").value.trim().toLowerCase();
-    const pass = document.getElementById("new-pass").value.trim();
-    const email = document.getElementById("new-email").value.trim();
-    const rol = document.getElementById("new-role").value;
-    if(id && pass && email) {
-        await setDoc(doc(db, "usuarios", id), { pass, email, rol });
-        alert("Usuario Creado con éxito");
-        document.getElementById("new-user").value = "";
-        document.getElementById("new-pass").value = "";
-        document.getElementById("new-email").value = "";
-    }
-};
-
-window.agregarProducto = async () => {
-    const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
-    const c = parseInt(document.getElementById("cantidad-prod").value);
-    if(n && !isNaN(c)) {
-        await setDoc(doc(db, "inventario", n), { cantidad: c });
-        cerrarModalInsumo();
-        document.getElementById("nombre-prod").value = "";
-        document.getElementById("cantidad-prod").value = "";
-    } else { alert("Ingrese datos válidos."); }
-};
-
-window.eliminarDato = async (col, id) => { if(confirm("¿Estás seguro de eliminar este registro?")) await deleteDoc(doc(db, col, id)); };
-window.cerrarSesion = () => location.reload();
-window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
-window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
+async function enviarMail(dest, info) {
+    if(!dest) return;
+    emailjs.send("default_service", "vvoz2ae", { destinatario: dest, ...info, name: "FCILog System" });
+}
 
 function actualizarGrafica(l, d) {
     const ctx = document.getElementById('stockChart'); if(!ctx) return;
