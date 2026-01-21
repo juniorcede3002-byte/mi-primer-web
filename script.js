@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -93,31 +92,29 @@ window.agregarProducto = async () => {
 window.procesarSolicitud = async () => {
     const ins = document.getElementById("sol-insumo").value;
     const cant = parseInt(document.getElementById("sol-cantidad").value);
-    const ubi = document.getElementById("sol-ubicacion").value.trim();
+    const ubi = document.getElementById("sol-ubicacion").value; // Ahora es un SELECT
 
-    if(!ins || isNaN(cant) || cant <= 0) return alert("Completa los datos correctamente.");
+    if(!ins || isNaN(cant) || cant <= 0 || !ubi) return alert("Completa todos los datos y selecciona una sede.");
 
     await addDoc(collection(db, "pedidos"), {
         usuarioId: usuarioActual.id,
         insumoNom: ins,
         cantidad: cant,
-        ubicacion: ubi || "Sin especificar",
+        ubicacion: ubi,
         estado: "pendiente",
         fecha: new Date().toLocaleString(),
         timestamp: Date.now()
     });
     
-    // Si es Admin quien pide, se envía igual (puedes auto-aprobar aquí si quisieras, pero mejor mantener flujo)
     enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "SOLICITUD NUEVA", ubicacion: ubi });
     alert("Solicitud enviada.");
     document.getElementById("sol-cantidad").value = "";
-    document.getElementById("sol-ubicacion").value = "";
+    document.getElementById("sol-ubicacion").value = ""; // Resetea el select
     
-    // Redirigir según rol
     if(usuarioActual.rol === 'admin') {
-        window.verPagina('solicitudes'); // Admin va a ver las pendientes
+        window.verPagina('solicitudes');
     } else {
-        window.verPagina('notificaciones'); // Usuario va a sus notificaciones
+        window.verPagina('notificaciones');
     }
 };
 
@@ -139,6 +136,58 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
         await updateDoc(pRef, { estado: "rechazado" });
         enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
     }
+};
+
+// --- NUEVA FUNCIÓN: DESCARGAR REPORTE ---
+window.descargarReporte = async () => {
+    if(!confirm("¿Deseas descargar el reporte completo de movimientos (CSV)?")) return;
+
+    // Obtener datos
+    const pedidosSnap = await getDocs(collection(db, "pedidos"));
+    const entradasSnap = await getDocs(collection(db, "entradas_stock"));
+
+    let data = [];
+
+    // Procesar Pedidos (Salidas)
+    pedidosSnap.forEach(doc => {
+        const d = doc.data();
+        // Limpiamos comas para no romper el CSV
+        const fecha = d.fecha.replace(/,/g, '');
+        data.push({
+            timestamp: d.timestamp || 0,
+            fila: `${fecha},SALIDA,${d.insumoNom},${d.cantidad},${d.usuarioId},${d.ubicacion},${d.estado}`
+        });
+    });
+
+    // Procesar Entradas (Stock Agregado)
+    entradasSnap.forEach(doc => {
+        const d = doc.data();
+        const fecha = d.fecha.replace(/,/g, '');
+        data.push({
+            timestamp: d.timestamp || 0,
+            fila: `${fecha},ENTRADA,${d.insumo},${d.cantidad},${d.usuario},ALMACEN,APROBADO`
+        });
+    });
+
+    // Ordenar por fecha (más reciente primero)
+    data.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Crear contenido CSV
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "FECHA,TIPO MOVIMIENTO,INSUMO,CANTIDAD,USUARIO,DESTINO/UBICACION,ESTADO\r\n"; // Cabecera
+    
+    data.forEach(row => {
+        csvContent += row.fila + "\r\n";
+    });
+
+    // Descargar
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "reporte_fcilog.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 window.crearUsuario = async () => {
@@ -172,12 +221,11 @@ function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
     const isAdmin = usuarioActual.rol === 'admin';
     
-    // MENÚ ACTUALIZADO: ADMIN AHORA TIENE "REALIZAR PEDIDO"
     const rutas = isAdmin ? 
         [
             {id:'stats', n:'Dashboard', i:'chart-line'}, 
             {id:'stock', n:'Stock', i:'box'}, 
-            {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'}, // NUEVO BOTÓN PARA ADMIN
+            {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'}, 
             {id:'solicitudes', n:'Pendientes', i:'bell'}, 
             {id:'historial', n:'Historial', i:'clock-rotate-left'}, 
             {id:'usuarios', n:'Usuarios', i:'users'}
@@ -195,7 +243,6 @@ function configurarMenu() {
 }
 
 function activarSincronizacion() {
-    // 1. Inventario
     onSnapshot(collection(db, "inventario"), snap => {
         const list = document.getElementById("lista-inventario");
         const sel = document.getElementById("sol-insumo");
@@ -226,7 +273,6 @@ function activarSincronizacion() {
         }
     });
 
-    // 2. Pedidos (Salidas)
     onSnapshot(collection(db, "pedidos"), snap => {
         const filtro = document.getElementById("filtro-fecha") ? document.getElementById("filtro-fecha").value : 'actual';
         const ahora = new Date();
@@ -248,7 +294,6 @@ function activarSincronizacion() {
             const p = d.data();
             const pFecha = new Date(p.timestamp || Date.now());
 
-            // Filtros para Estadísticas
             let pasaFiltro = true;
             if(filtro === 'actual') pasaFiltro = pFecha.getMonth() === mesActual && pFecha.getFullYear() === añoActual;
             if(filtro === 'anterior') pasaFiltro = pFecha.getMonth() === (mesActual - 1 === -1 ? 11 : mesActual - 1);
@@ -259,7 +304,6 @@ function activarSincronizacion() {
                 statsIns[p.insumoNom] = (statsIns[p.insumoNom] || 0) + 1;
             }
 
-            // Vista Admin Pendientes
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 pCnt++;
                 lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm border-l-4 border-l-amber-400">
@@ -270,7 +314,6 @@ function activarSincronizacion() {
                     </div>
                 </div>`;
             }
-            // Vista Historial (Tabla Salidas)
             if(usuarioActual.rol === 'admin' && p.estado !== 'pendiente') {
                 tHist.innerHTML += `<tr class="border-b hover:bg-slate-50">
                     <td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td>
@@ -281,7 +324,6 @@ function activarSincronizacion() {
                     <td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td>
                 </tr>`;
             }
-            // Vista Usuario
             if(p.usuarioId === usuarioActual.id) {
                 lUser.innerHTML += `<div class="notif-card"><div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>Destino: ${p.ubicacion}</small></div><span class="badge status-${p.estado}">${p.estado}</span></div>`;
             }
@@ -295,16 +337,14 @@ function activarSincronizacion() {
         }
     });
 
-    // 3. NUEVO: Historial de Entradas (Stock Agregado)
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "entradas_stock"), snap => {
             const tEntradas = document.getElementById("tabla-entradas-body");
             if(tEntradas) {
                 tEntradas.innerHTML = "";
-                // Ordenar en cliente (simple) o usar query si se prefiere
                 const docs = [];
                 snap.forEach(d => docs.push(d.data()));
-                docs.sort((a,b) => b.timestamp - a.timestamp); // Más reciente primero
+                docs.sort((a,b) => b.timestamp - a.timestamp);
 
                 docs.forEach(e => {
                     tEntradas.innerHTML += `<tr class="border-b border-emerald-50 hover:bg-emerald-50/30">
@@ -317,7 +357,6 @@ function activarSincronizacion() {
             }
         });
 
-        // 4. Usuarios
         onSnapshot(collection(db, "usuarios"), snap => {
             const list = document.getElementById("lista-usuarios-db");
             if(list) {
