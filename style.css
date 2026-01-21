@@ -1,45 +1,158 @@
-:root {
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --success: #166534;
-    --danger: #991b1b;
-    --warning: #92400e;
-    --bg-main: #f8fafc;
-    --white: #ffffff;
-    --border: #e2e8f0;
-    --radius-lg: 1.25rem;
-    --radius-xl: 2rem;
-    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+/* IMPORTAR FUENTE */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ESTILOS GENERALES */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc; /* Slate-50 */
+    color: #0f172a; /* Slate-900 */
+    -webkit-font-smoothing: antialiased;
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); overflow-x: hidden; }
-
+/* INPUTS PERSONALIZADOS */
 .input-light {
-    width: 100%; background-color: #f1f5f9; border: 2px solid transparent;
-    padding: 1rem 1.25rem; border-radius: var(--radius-lg); font-size: 1rem;
-    font-weight: 500; outline: none; transition: all 0.3s ease;
+    width: 100%;
+    padding: 1rem;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem; /* 12px */
+    outline: none;
+    transition: all 0.3s ease;
+    font-size: 0.95rem;
+    color: #334155;
 }
 
-.input-light:focus { background-color: var(--white); border-color: var(--primary); }
+.input-light:focus {
+    background-color: #ffffff;
+    border-color: #6366f1; /* Indigo-500 */
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
 
+/* TARJETAS DE MÉTRICAS */
 .card-metrica {
-    background: var(--white); padding: 1.75rem; border-radius: var(--radius-xl);
-    border: 1px solid var(--border); box-shadow: var(--shadow);
+    background: white;
+    padding: 1.5rem;
+    border-radius: 1.5rem; /* 24px */
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
-.card-metrica span { font-size: 0.75rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+.card-metrica span {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
 
-.badge { padding: 0.4rem 1rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
-.status-pendiente { background: #fef3c7; color: var(--warning); }
-.status-aprobado { background: #dcfce7; color: var(--success); }
-.status-rechazado { background: #fee2e2; color: var(--danger); }
+.card-metrica h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #1e293b;
+}
 
-.user-card, .notif-card { background: var(--white); padding: 1.25rem; border-radius: 1.5rem; border: 1px solid var(--border); }
-.notif-card { border-left: 6px solid var(--primary); }
+/* BADGES (ETIQUETAS DE ESTADO) */
+.badge {
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+}
 
-.view { animation: fadeIn 0.4s ease-out forwards; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.status-pendiente {
+    background: #fffbeb;
+    color: #d97706; /* Amber-600 */
+    border: 1px solid #fcd34d;
+}
 
-@media (max-width: 768px) { #sidebar { width: 85%; } }
+.status-aprobado {
+    background: #f0fdf4;
+    color: #16a34a; /* Green-600 */
+    border: 1px solid #86efac;
+}
+
+.status-rechazado {
+    background: #fef2f2;
+    color: #dc2626; /* Red-600 */
+    border: 1px solid #fca5a5;
+}
+
+.status-nueva { /* Para solicitudes recién creadas */
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+
+/* TARJETAS DE USUARIO Y NOTIFICACIONES */
+.user-card {
+    background: #ffffff;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.2s;
+}
+
+.user-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.notif-card {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 0.75rem;
+}
+
+/* UTILIDADES VISUALES */
+.view {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* TABLAS RESPONSIVAS */
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+th {
+    letter-spacing: 0.05em;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* SCROLLBAR PERSONALIZADO (Chrome/Safari) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
