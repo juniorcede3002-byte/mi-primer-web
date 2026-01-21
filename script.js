@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+// CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -10,16 +11,21 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
 let usuarioActual = null;
 let stockChart = null;
+let userChart = null;
+let locationChart = null;
+let insumoChart = null;
 
-emailjs.init("2jVnfkJKKG0bpKN-U"); 
+emailjs.init("2jVnfkJKKG0bpKN-U");
 
-// --- FUNCIONES GLOBALES (ACCESIBLES DESDE EL HTML) ---
+// --- FUNCIONES GLOBALES (ACCESIBLES DESDE HTML) ---
 
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
     const pass = document.getElementById("login-pass").value.trim();
+
     if (user === "admin" && pass === "1130") {
         cargarSesion({ id: "admin", rol: "admin", email: "archivos@fcipty.com" });
     } else {
@@ -49,13 +55,47 @@ window.cerrarSesion = () => location.reload();
 window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
 window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
 
-// SOLICITUDES
+// --- GESTIÓN DE STOCK (CON REGISTRO DE ENTRADA) ---
+window.agregarProducto = async () => {
+    const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
+    const c = parseInt(document.getElementById("cantidad-prod").value);
+    
+    if(n && !isNaN(c) && c > 0) {
+        const docRef = doc(db, "inventario", n);
+        const docSnap = await getDoc(docRef);
+
+        // 1. Actualizar Cantidad en Inventario
+        if (docSnap.exists()) {
+            await updateDoc(docRef, { cantidad: docSnap.data().cantidad + c });
+        } else {
+            await setDoc(docRef, { cantidad: c });
+        }
+
+        // 2. Guardar en Historial de Entradas
+        await addDoc(collection(db, "entradas_stock"), {
+            insumo: n,
+            cantidad: c,
+            usuario: usuarioActual.id,
+            fecha: new Date().toLocaleString(),
+            timestamp: Date.now()
+        });
+        
+        window.cerrarModalInsumo();
+        document.getElementById("nombre-prod").value = "";
+        document.getElementById("cantidad-prod").value = "";
+        alert("Stock agregado y registrado en historial.");
+    } else {
+        alert("Por favor ingresa un nombre y cantidad válida.");
+    }
+};
+
+// --- PROCESAR PEDIDOS ---
 window.procesarSolicitud = async () => {
     const ins = document.getElementById("sol-insumo").value;
     const cant = parseInt(document.getElementById("sol-cantidad").value);
     const ubi = document.getElementById("sol-ubicacion").value.trim();
 
-    if(!ins || isNaN(cant) || cant <= 0) return alert("Por favor complete todos los campos.");
+    if(!ins || isNaN(cant) || cant <= 0) return alert("Completa los datos correctamente.");
 
     await addDoc(collection(db, "pedidos"), {
         usuarioId: usuarioActual.id,
@@ -63,14 +103,22 @@ window.procesarSolicitud = async () => {
         cantidad: cant,
         ubicacion: ubi || "Sin especificar",
         estado: "pendiente",
-        fecha: new Date().toLocaleString()
+        fecha: new Date().toLocaleString(),
+        timestamp: Date.now()
     });
     
-    enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "SOLICITUD PENDIENTE", ubicacion: ubi });
-    alert("Solicitud enviada con éxito.");
+    // Si es Admin quien pide, se envía igual (puedes auto-aprobar aquí si quisieras, pero mejor mantener flujo)
+    enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "SOLICITUD NUEVA", ubicacion: ubi });
+    alert("Solicitud enviada.");
     document.getElementById("sol-cantidad").value = "";
     document.getElementById("sol-ubicacion").value = "";
-    window.verPagina('notificaciones');
+    
+    // Redirigir según rol
+    if(usuarioActual.rol === 'admin') {
+        window.verPagina('solicitudes'); // Admin va a ver las pendientes
+    } else {
+        window.verPagina('notificaciones'); // Usuario va a sus notificaciones
+    }
 };
 
 window.gestionarPedido = async (pid, accion, ins, cant) => {
@@ -85,34 +133,11 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
         if(iSnap.exists() && iSnap.data().cantidad >= cant) {
             await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
             await updateDoc(pRef, { estado: "aprobado" });
-            enviarMail(uMail, { usuario: "Sistema Admin", insumo: ins, cantidad: cant, estado: "APROBADO", ubicacion: pData.ubicacion });
-        } else { alert("Stock insuficiente para aprobar."); }
+            enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "APROBADO", ubicacion: pData.ubicacion });
+        } else { alert("No hay stock suficiente."); }
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
-        enviarMail(uMail, { usuario: "Sistema Admin", insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
-    }
-};
-
-// GESTIÓN DE STOCK (CON SUMA AUTOMÁTICA)
-window.agregarProducto = async () => {
-    const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
-    const c = parseInt(document.getElementById("cantidad-prod").value);
-    
-    if(n && !isNaN(c)) {
-        const docRef = doc(db, "inventario", n);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const cantidadActual = docSnap.data().cantidad || 0;
-            await updateDoc(docRef, { cantidad: cantidadActual + c });
-        } else {
-            await setDoc(docRef, { cantidad: c });
-        }
-        
-        window.cerrarModalInsumo();
-        document.getElementById("nombre-prod").value = "";
-        document.getElementById("cantidad-prod").value = "";
-        alert("Stock actualizado.");
+        enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
     }
 };
 
@@ -123,14 +148,14 @@ window.crearUsuario = async () => {
     const rol = document.getElementById("new-role").value;
     if(id && pass) {
         await setDoc(doc(db, "usuarios", id), { pass, email, rol });
-        alert("Usuario guardado correctamente.");
+        alert("Usuario guardado");
         document.getElementById("new-user").value = "";
     }
 };
 
-window.eliminarDato = async (col, id) => { if(confirm("¿Seguro que deseas eliminar este registro?")) await deleteDoc(doc(db, col, id)); };
+window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar registro?")) await deleteDoc(doc(db, col, id)); };
 
-// --- LÓGICA DE CARGA Y SINCRONIZACIÓN ---
+// --- LÓGICA INTERNA ---
 
 function cargarSesion(datos) {
     usuarioActual = datos;
@@ -146,9 +171,22 @@ function cargarSesion(datos) {
 function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
     const isAdmin = usuarioActual.rol === 'admin';
+    
+    // MENÚ ACTUALIZADO: ADMIN AHORA TIENE "REALIZAR PEDIDO"
     const rutas = isAdmin ? 
-        [{id:'stats', n:'Dashboard', i:'chart-line'}, {id:'stock', n:'Stock', i:'box'}, {id:'solicitudes', n:'Pendientes', i:'bell'}, {id:'historial', n:'Historial', i:'clock-rotate-left'}, {id:'usuarios', n:'Usuarios', i:'users'}] :
-        [{id:'stock', n:'Ver Stock', i:'eye'}, {id:'solicitar', n:'Pedir', i:'plus'}, {id:'notificaciones', n:'Mis Pedidos', i:'history'}];
+        [
+            {id:'stats', n:'Dashboard', i:'chart-line'}, 
+            {id:'stock', n:'Stock', i:'box'}, 
+            {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'}, // NUEVO BOTÓN PARA ADMIN
+            {id:'solicitudes', n:'Pendientes', i:'bell'}, 
+            {id:'historial', n:'Historial', i:'clock-rotate-left'}, 
+            {id:'usuarios', n:'Usuarios', i:'users'}
+        ] :
+        [
+            {id:'stock', n:'Ver Stock', i:'eye'}, 
+            {id:'solicitar', n:'Pedir', i:'plus'}, 
+            {id:'notificaciones', n:'Mis Pedidos', i:'history'}
+        ];
 
     menu.innerHTML = rutas.map(r => `
         <button onclick="verPagina('${r.id}')" class="w-full flex items-center gap-3 p-4 text-slate-600 hover:bg-indigo-50 rounded-xl transition font-bold">
@@ -157,7 +195,7 @@ function configurarMenu() {
 }
 
 function activarSincronizacion() {
-    // Sincronizar Stock y Listas Desplegables
+    // 1. Inventario
     onSnapshot(collection(db, "inventario"), snap => {
         const list = document.getElementById("lista-inventario");
         const sel = document.getElementById("sol-insumo");
@@ -184,22 +222,44 @@ function activarSincronizacion() {
         if(usuarioActual.rol === 'admin') {
             document.getElementById("metrica-total").innerText = snap.size;
             document.getElementById("metrica-stock").innerText = tot;
-            actualizarGrafica(lbs, vls);
+            renderChart('stockChart', lbs, vls, 'Stock Actual', '#6366f1', stockChart, c => stockChart = c);
         }
     });
 
-    // Sincronizar Pedidos e Historial
+    // 2. Pedidos (Salidas)
     onSnapshot(collection(db, "pedidos"), snap => {
+        const filtro = document.getElementById("filtro-fecha") ? document.getElementById("filtro-fecha").value : 'actual';
+        const ahora = new Date();
+        const mesActual = ahora.getMonth();
+        const añoActual = ahora.getFullYear();
+
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
         const tHist = document.getElementById("tabla-historial-body");
-        let pCnt = 0;
         
-        if(lAdmin) lAdmin.innerHTML = ""; if(lUser) lUser.innerHTML = ""; if(tHist) tHist.innerHTML = "";
+        let pCnt = 0;
+        const statsUser = {}, statsLoc = {}, statsIns = {};
+
+        if(lAdmin) lAdmin.innerHTML = ""; 
+        if(lUser) lUser.innerHTML = ""; 
+        if(tHist) tHist.innerHTML = "";
 
         snap.forEach(d => {
             const p = d.data();
-            // Para el Admin: Pendientes
+            const pFecha = new Date(p.timestamp || Date.now());
+
+            // Filtros para Estadísticas
+            let pasaFiltro = true;
+            if(filtro === 'actual') pasaFiltro = pFecha.getMonth() === mesActual && pFecha.getFullYear() === añoActual;
+            if(filtro === 'anterior') pasaFiltro = pFecha.getMonth() === (mesActual - 1 === -1 ? 11 : mesActual - 1);
+
+            if(pasaFiltro && p.estado === 'aprobado' && usuarioActual.rol === 'admin') {
+                statsUser[p.usuarioId] = (statsUser[p.usuarioId] || 0) + 1;
+                statsLoc[p.ubicacion] = (statsLoc[p.ubicacion] || 0) + 1;
+                statsIns[p.insumoNom] = (statsIns[p.insumoNom] || 0) + 1;
+            }
+
+            // Vista Admin Pendientes
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 pCnt++;
                 lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm border-l-4 border-l-amber-400">
@@ -210,10 +270,10 @@ function activarSincronizacion() {
                     </div>
                 </div>`;
             }
-            // Para el Historial (Todo lo que no sea pendiente)
+            // Vista Historial (Tabla Salidas)
             if(usuarioActual.rol === 'admin' && p.estado !== 'pendiente') {
-                tHist.innerHTML += `<tr>
-                    <td class="p-4 text-slate-400">${p.fecha.split(',')[0]}</td>
+                tHist.innerHTML += `<tr class="border-b hover:bg-slate-50">
+                    <td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td>
                     <td class="p-4 font-bold uppercase">${p.insumoNom}</td>
                     <td class="p-4">x${p.cantidad}</td>
                     <td class="p-4 italic font-medium text-indigo-600">${p.ubicacion}</td>
@@ -221,16 +281,43 @@ function activarSincronizacion() {
                     <td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td>
                 </tr>`;
             }
-            // Para el Usuario: Sus propios pedidos
+            // Vista Usuario
             if(p.usuarioId === usuarioActual.id) {
                 lUser.innerHTML += `<div class="notif-card"><div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>Destino: ${p.ubicacion}</small></div><span class="badge status-${p.estado}">${p.estado}</span></div>`;
             }
         });
-        if(usuarioActual.rol === 'admin') document.getElementById("metrica-pedidos").innerText = pCnt;
+
+        if(usuarioActual.rol === 'admin') {
+            document.getElementById("metrica-pedidos").innerText = pCnt;
+            renderChart('userChart', Object.keys(statsUser), Object.values(statsUser), 'Pedidos', '#818cf8', userChart, c => userChart = c, 'y');
+            renderChart('locationChart', Object.keys(statsLoc), Object.values(statsLoc), 'Consumo', '#fbbf24', locationChart, c => locationChart = c, 'y');
+            renderChart('insumoChart', Object.keys(statsIns), Object.values(statsIns), 'Insumo', '#34d399', insumoChart, c => insumoChart = c);
+        }
     });
 
-    // Usuarios
+    // 3. NUEVO: Historial de Entradas (Stock Agregado)
     if(usuarioActual.rol === 'admin') {
+        onSnapshot(collection(db, "entradas_stock"), snap => {
+            const tEntradas = document.getElementById("tabla-entradas-body");
+            if(tEntradas) {
+                tEntradas.innerHTML = "";
+                // Ordenar en cliente (simple) o usar query si se prefiere
+                const docs = [];
+                snap.forEach(d => docs.push(d.data()));
+                docs.sort((a,b) => b.timestamp - a.timestamp); // Más reciente primero
+
+                docs.forEach(e => {
+                    tEntradas.innerHTML += `<tr class="border-b border-emerald-50 hover:bg-emerald-50/30">
+                        <td class="p-4 text-slate-500">${e.fecha}</td>
+                        <td class="p-4 font-bold uppercase text-emerald-800">${e.insumo}</td>
+                        <td class="p-4 font-bold text-emerald-600">+${e.cantidad}</td>
+                        <td class="p-4 text-xs text-slate-400">${e.usuario}</td>
+                    </tr>`;
+                });
+            }
+        });
+
+        // 4. Usuarios
         onSnapshot(collection(db, "usuarios"), snap => {
             const list = document.getElementById("lista-usuarios-db");
             if(list) {
@@ -248,8 +335,13 @@ async function enviarMail(dest, info) {
     emailjs.send("default_service", "vvoz2ae", { destinatario: dest, ...info, name: "FCILog System" });
 }
 
-function actualizarGrafica(l, d) {
-    const ctx = document.getElementById('stockChart'); if(!ctx) return;
-    if(stockChart) stockChart.destroy();
-    stockChart = new Chart(ctx, { type: 'bar', data: { labels: l, datasets: [{ label: 'Stock Actual', data: d, backgroundColor: '#6366f1', borderRadius: 8 }] }, options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } } });
+function renderChart(id, labels, data, title, color, instance, setInst, axis = 'x') {
+    const ctx = document.getElementById(id);
+    if(!ctx) return;
+    if(instance) instance.destroy();
+    setInst(new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: title, data, backgroundColor: color, borderRadius: 5 }] },
+        options: { indexAxis: axis, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { beginAtZero: true } } }
+    }));
 }
