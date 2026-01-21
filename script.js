@@ -19,7 +19,16 @@ let insumoChart = null;
 
 emailjs.init("2jVnfkJKKG0bpKN-U");
 
-// --- FUNCIONES GLOBALES (ACCESIBLES DESDE HTML) ---
+// --- PERSISTENCIA DE SESIÓN ---
+// Al cargar el documento, verificamos si hay una sesión guardada
+window.addEventListener('DOMContentLoaded', () => {
+    const sesionGuardada = localStorage.getItem("fcilog_session");
+    if (sesionGuardada) {
+        cargarSesion(JSON.parse(sesionGuardada));
+    }
+});
+
+// --- FUNCIONES GLOBALES ---
 
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
@@ -33,6 +42,30 @@ window.iniciarSesion = async () => {
             cargarSesion({ id: user, ...snap.data() });
         } else { alert("Usuario o clave incorrectos"); }
     }
+};
+
+function cargarSesion(datos) {
+    usuarioActual = datos;
+    // Guardamos en el almacenamiento local del navegador
+    localStorage.setItem("fcilog_session", JSON.stringify(datos));
+    
+    document.getElementById("pantalla-login").classList.add("hidden");
+    document.getElementById("interfaz-app").classList.remove("hidden");
+    
+    if(datos.rol === 'admin') {
+        const btnAdmin = document.getElementById("btn-admin-stock");
+        if(btnAdmin) btnAdmin.classList.remove("hidden");
+    }
+    
+    configurarMenu();
+    window.verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
+    activarSincronizacion();
+}
+
+window.cerrarSesion = () => {
+    // Borramos la sesión de la memoria y recargamos
+    localStorage.removeItem("fcilog_session");
+    location.reload();
 };
 
 window.verPagina = (id) => {
@@ -50,11 +83,10 @@ window.toggleMenu = () => {
     document.getElementById("sidebar-overlay").classList.toggle("hidden");
 };
 
-window.cerrarSesion = () => location.reload();
 window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
 window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
 
-// --- GESTIÓN DE STOCK (CON REGISTRO DE ENTRADA) ---
+// --- GESTIÓN DE STOCK ---
 window.agregarProducto = async () => {
     const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
     const c = parseInt(document.getElementById("cantidad-prod").value);
@@ -63,14 +95,12 @@ window.agregarProducto = async () => {
         const docRef = doc(db, "inventario", n);
         const docSnap = await getDoc(docRef);
 
-        // 1. Actualizar Cantidad en Inventario
         if (docSnap.exists()) {
             await updateDoc(docRef, { cantidad: docSnap.data().cantidad + c });
         } else {
             await setDoc(docRef, { cantidad: c });
         }
 
-        // 2. Guardar en Historial de Entradas
         await addDoc(collection(db, "entradas_stock"), {
             insumo: n,
             cantidad: c,
@@ -82,9 +112,9 @@ window.agregarProducto = async () => {
         window.cerrarModalInsumo();
         document.getElementById("nombre-prod").value = "";
         document.getElementById("cantidad-prod").value = "";
-        alert("Stock agregado y registrado en historial.");
+        alert("Stock registrado con éxito.");
     } else {
-        alert("Por favor ingresa un nombre y cantidad válida.");
+        alert("Ingresa datos válidos.");
     }
 };
 
@@ -92,9 +122,9 @@ window.agregarProducto = async () => {
 window.procesarSolicitud = async () => {
     const ins = document.getElementById("sol-insumo").value;
     const cant = parseInt(document.getElementById("sol-cantidad").value);
-    const ubi = document.getElementById("sol-ubicacion").value; // Ahora es un SELECT
+    const ubi = document.getElementById("sol-ubicacion").value;
 
-    if(!ins || isNaN(cant) || cant <= 0 || !ubi) return alert("Completa todos los datos y selecciona una sede.");
+    if(!ins || isNaN(cant) || cant <= 0 || !ubi) return alert("Selecciona sede, insumo y cantidad.");
 
     await addDoc(collection(db, "pedidos"), {
         usuarioId: usuarioActual.id,
@@ -107,15 +137,11 @@ window.procesarSolicitud = async () => {
     });
     
     enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "SOLICITUD NUEVA", ubicacion: ubi });
-    alert("Solicitud enviada.");
+    alert("Solicitud enviada correctamente.");
     document.getElementById("sol-cantidad").value = "";
-    document.getElementById("sol-ubicacion").value = ""; // Resetea el select
+    document.getElementById("sol-ubicacion").value = "";
     
-    if(usuarioActual.rol === 'admin') {
-        window.verPagina('solicitudes');
-    } else {
-        window.verPagina('notificaciones');
-    }
+    window.verPagina(usuarioActual.rol === 'admin' ? 'solicitudes' : 'notificaciones');
 };
 
 window.gestionarPedido = async (pid, accion, ins, cant) => {
@@ -131,59 +157,38 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
             await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
             await updateDoc(pRef, { estado: "aprobado" });
             enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "APROBADO", ubicacion: pData.ubicacion });
-        } else { alert("No hay stock suficiente."); }
+        } else { alert("Stock insuficiente."); }
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
         enviarMail(uMail, { usuario: "Sistema", insumo: ins, cantidad: cant, estado: "RECHAZADO", ubicacion: pData.ubicacion });
     }
 };
 
-// --- NUEVA FUNCIÓN: DESCARGAR REPORTE ---
+// --- EXPORTAR REPORTE ---
 window.descargarReporte = async () => {
-    if(!confirm("¿Deseas descargar el reporte completo de movimientos (CSV)?")) return;
+    if(!confirm("¿Descargar historial completo en CSV?")) return;
 
-    // Obtener datos
     const pedidosSnap = await getDocs(collection(db, "pedidos"));
     const entradasSnap = await getDocs(collection(db, "entradas_stock"));
-
     let data = [];
 
-    // Procesar Pedidos (Salidas)
     pedidosSnap.forEach(doc => {
         const d = doc.data();
-        // Limpiamos comas para no romper el CSV
-        const fecha = d.fecha.replace(/,/g, '');
-        data.push({
-            timestamp: d.timestamp || 0,
-            fila: `${fecha},SALIDA,${d.insumoNom},${d.cantidad},${d.usuarioId},${d.ubicacion},${d.estado}`
-        });
+        data.push({ timestamp: d.timestamp || 0, fila: `${d.fecha.replace(/,/g, '')},SALIDA,${d.insumoNom},${d.cantidad},${d.usuarioId},${d.ubicacion},${d.estado}` });
     });
 
-    // Procesar Entradas (Stock Agregado)
     entradasSnap.forEach(doc => {
         const d = doc.data();
-        const fecha = d.fecha.replace(/,/g, '');
-        data.push({
-            timestamp: d.timestamp || 0,
-            fila: `${fecha},ENTRADA,${d.insumo},${d.cantidad},${d.usuario},ALMACEN,APROBADO`
-        });
+        data.push({ timestamp: d.timestamp || 0, fila: `${d.fecha.replace(/,/g, '')},ENTRADA,${d.insumo},${d.cantidad},${d.usuario},ALMACEN,APROBADO` });
     });
 
-    // Ordenar por fecha (más reciente primero)
     data.sort((a, b) => b.timestamp - a.timestamp);
 
-    // Crear contenido CSV
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "FECHA,TIPO MOVIMIENTO,INSUMO,CANTIDAD,USUARIO,DESTINO/UBICACION,ESTADO\r\n"; // Cabecera
-    
-    data.forEach(row => {
-        csvContent += row.fila + "\r\n";
-    });
+    let csvContent = "data:text/csv;charset=utf-8,FECHA,TIPO,INSUMO,CANTIDAD,USUARIO,UBICACION,ESTADO\r\n";
+    data.forEach(row => csvContent += row.fila + "\r\n");
 
-    // Descargar
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", encodeURI(csvContent));
     link.setAttribute("download", "reporte_fcilog.csv");
     document.body.appendChild(link);
     link.click();
@@ -197,44 +202,21 @@ window.crearUsuario = async () => {
     const rol = document.getElementById("new-role").value;
     if(id && pass) {
         await setDoc(doc(db, "usuarios", id), { pass, email, rol });
-        alert("Usuario guardado");
+        alert("Usuario creado");
         document.getElementById("new-user").value = "";
     }
 };
 
-window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar registro?")) await deleteDoc(doc(db, col, id)); };
+window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, col, id)); };
 
-// --- LÓGICA INTERNA ---
-
-function cargarSesion(datos) {
-    usuarioActual = datos;
-    document.getElementById("pantalla-login").classList.add("hidden");
-    document.getElementById("interfaz-app").classList.remove("hidden");
-    if(datos.rol === 'admin') document.getElementById("btn-admin-stock").classList.remove("hidden");
-    
-    configurarMenu();
-    window.verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
-    activarSincronizacion();
-}
+// --- LÓGICA DE INTERFAZ ---
 
 function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
     const isAdmin = usuarioActual.rol === 'admin';
-    
     const rutas = isAdmin ? 
-        [
-            {id:'stats', n:'Dashboard', i:'chart-line'}, 
-            {id:'stock', n:'Stock', i:'box'}, 
-            {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'}, 
-            {id:'solicitudes', n:'Pendientes', i:'bell'}, 
-            {id:'historial', n:'Historial', i:'clock-rotate-left'}, 
-            {id:'usuarios', n:'Usuarios', i:'users'}
-        ] :
-        [
-            {id:'stock', n:'Ver Stock', i:'eye'}, 
-            {id:'solicitar', n:'Pedir', i:'plus'}, 
-            {id:'notificaciones', n:'Mis Pedidos', i:'history'}
-        ];
+        [{id:'stats', n:'Dashboard', i:'chart-line'}, {id:'stock', n:'Stock', i:'box'}, {id:'solicitar', n:'Pedido', i:'plus'}, {id:'solicitudes', n:'Pendientes', i:'bell'}, {id:'historial', n:'Historial', i:'clock'}, {id:'usuarios', n:'Usuarios', i:'users'}] :
+        [{id:'stock', n:'Stock', i:'eye'}, {id:'solicitar', n:'Pedir', i:'plus'}, {id:'notificaciones', n:'Mis Pedidos', i:'history'}];
 
     menu.innerHTML = rutas.map(r => `
         <button onclick="verPagina('${r.id}')" class="w-full flex items-center gap-3 p-4 text-slate-600 hover:bg-indigo-50 rounded-xl transition font-bold">
@@ -247,7 +229,6 @@ function activarSincronizacion() {
         const list = document.getElementById("lista-inventario");
         const sel = document.getElementById("sol-insumo");
         const dl = document.getElementById("admin-stock-dl");
-        
         let lbs = [], vls = [], tot = 0;
         list.innerHTML = "";
         if(sel) sel.innerHTML = '<option value="">Seleccionar Insumo...</option>';
@@ -256,12 +237,10 @@ function activarSincronizacion() {
         snap.forEach(d => {
             const p = d.data(); const n = d.id;
             tot += p.cantidad; lbs.push(n.toUpperCase()); vls.push(p.cantidad);
-
             list.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm">
                 <div><b class="uppercase">${n}</b><p class="text-xs text-slate-400 font-bold">Stock: ${p.cantidad}</p></div>
-                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${n}')" class="text-red-400 p-2 hover:bg-red-50 rounded-lg"><i class="fas fa-trash"></i></button>` : ''}
+                ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${n}')" class="text-red-400 p-2"><i class="fas fa-trash"></i></button>` : ''}
             </div>`;
-
             if(sel) sel.innerHTML += `<option value="${n}">${n.toUpperCase()}</option>`;
             if(dl) dl.innerHTML += `<option value="${n}">`;
         });
@@ -269,101 +248,68 @@ function activarSincronizacion() {
         if(usuarioActual.rol === 'admin') {
             document.getElementById("metrica-total").innerText = snap.size;
             document.getElementById("metrica-stock").innerText = tot;
-            renderChart('stockChart', lbs, vls, 'Stock Actual', '#6366f1', stockChart, c => stockChart = c);
+            renderChart('stockChart', lbs, vls, 'Stock', '#6366f1', stockChart, c => stockChart = c);
         }
     });
 
     onSnapshot(collection(db, "pedidos"), snap => {
-        const filtro = document.getElementById("filtro-fecha") ? document.getElementById("filtro-fecha").value : 'actual';
-        const ahora = new Date();
-        const mesActual = ahora.getMonth();
-        const añoActual = ahora.getFullYear();
-
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
         const tHist = document.getElementById("tabla-historial-body");
-        
         let pCnt = 0;
-        const statsUser = {}, statsLoc = {}, statsIns = {};
+        const sUsr = {}, sLoc = {}, sIns = {};
 
-        if(lAdmin) lAdmin.innerHTML = ""; 
-        if(lUser) lUser.innerHTML = ""; 
-        if(tHist) tHist.innerHTML = "";
+        if(lAdmin) lAdmin.innerHTML = ""; if(lUser) lUser.innerHTML = ""; if(tHist) tHist.innerHTML = "";
 
         snap.forEach(d => {
             const p = d.data();
-            const pFecha = new Date(p.timestamp || Date.now());
-
-            let pasaFiltro = true;
-            if(filtro === 'actual') pasaFiltro = pFecha.getMonth() === mesActual && pFecha.getFullYear() === añoActual;
-            if(filtro === 'anterior') pasaFiltro = pFecha.getMonth() === (mesActual - 1 === -1 ? 11 : mesActual - 1);
-
-            if(pasaFiltro && p.estado === 'aprobado' && usuarioActual.rol === 'admin') {
-                statsUser[p.usuarioId] = (statsUser[p.usuarioId] || 0) + 1;
-                statsLoc[p.ubicacion] = (statsLoc[p.ubicacion] || 0) + 1;
-                statsIns[p.insumoNom] = (statsIns[p.insumoNom] || 0) + 1;
+            if(p.estado === 'aprobado' && usuarioActual.rol === 'admin') {
+                sUsr[p.usuarioId] = (sUsr[p.usuarioId] || 0) + 1;
+                sLoc[p.ubicacion] = (sLoc[p.ubicacion] || 0) + 1;
+                sIns[p.insumoNom] = (sIns[p.insumoNom] || 0) + 1;
             }
-
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 pCnt++;
-                lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm border-l-4 border-l-amber-400">
-                    <div><b>${p.insumoNom.toUpperCase()}</b> (x${p.cantidad})<br><small class="text-indigo-600 font-bold">Destino: ${p.ubicacion}</small> | <small>${p.usuarioId}</small></div>
+                lAdmin.innerHTML += `<div class="bg-white p-5 rounded-2xl border flex justify-between items-center border-l-4 border-l-amber-400">
+                    <div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small class="text-indigo-600 font-bold">${p.ubicacion}</small></div>
                     <div class="flex gap-2">
-                        <button onclick="gestionarPedido('${d.id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md">Aprobar</button>
+                        <button onclick="gestionarPedido('${d.id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Aprobar</button>
                         <button onclick="gestionarPedido('${d.id}','rechazar','${p.insumoNom}',${p.cantidad})" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">X</button>
                     </div>
                 </div>`;
             }
             if(usuarioActual.rol === 'admin' && p.estado !== 'pendiente') {
-                tHist.innerHTML += `<tr class="border-b hover:bg-slate-50">
-                    <td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td>
-                    <td class="p-4 font-bold uppercase">${p.insumoNom}</td>
-                    <td class="p-4">x${p.cantidad}</td>
-                    <td class="p-4 italic font-medium text-indigo-600">${p.ubicacion}</td>
-                    <td class="p-4 text-xs">${p.usuarioId}</td>
-                    <td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td>
-                </tr>`;
+                tHist.innerHTML += `<tr class="border-b"><td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase">${p.insumoNom}</td><td class="p-4">x${p.cantidad}</td><td class="p-4 text-indigo-600 font-bold">${p.ubicacion}</td><td class="p-4 text-xs">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td></tr>`;
             }
             if(p.usuarioId === usuarioActual.id) {
-                lUser.innerHTML += `<div class="notif-card"><div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>Destino: ${p.ubicacion}</small></div><span class="badge status-${p.estado}">${p.estado}</span></div>`;
+                lUser.innerHTML += `<div class="notif-card"><div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>${p.ubicacion}</small></div><span class="badge status-${p.estado}">${p.estado}</span></div>`;
             }
         });
 
         if(usuarioActual.rol === 'admin') {
             document.getElementById("metrica-pedidos").innerText = pCnt;
-            renderChart('userChart', Object.keys(statsUser), Object.values(statsUser), 'Pedidos', '#818cf8', userChart, c => userChart = c, 'y');
-            renderChart('locationChart', Object.keys(statsLoc), Object.values(statsLoc), 'Consumo', '#fbbf24', locationChart, c => locationChart = c, 'y');
-            renderChart('insumoChart', Object.keys(statsIns), Object.values(statsIns), 'Insumo', '#34d399', insumoChart, c => insumoChart = c);
+            renderChart('userChart', Object.keys(sUsr), Object.values(sUsr), 'Pedidos', '#818cf8', userChart, c => userChart = c, 'y');
+            renderChart('locationChart', Object.keys(sLoc), Object.values(sLoc), 'Consumo', '#fbbf24', locationChart, c => locationChart = c, 'y');
+            renderChart('insumoChart', Object.keys(sIns), Object.values(sIns), 'Insumo', '#34d399', insumoChart, c => insumoChart = c);
         }
     });
 
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "entradas_stock"), snap => {
-            const tEntradas = document.getElementById("tabla-entradas-body");
-            if(tEntradas) {
-                tEntradas.innerHTML = "";
-                const docs = [];
-                snap.forEach(d => docs.push(d.data()));
-                docs.sort((a,b) => b.timestamp - a.timestamp);
-
-                docs.forEach(e => {
-                    tEntradas.innerHTML += `<tr class="border-b border-emerald-50 hover:bg-emerald-50/30">
-                        <td class="p-4 text-slate-500">${e.fecha}</td>
-                        <td class="p-4 font-bold uppercase text-emerald-800">${e.insumo}</td>
-                        <td class="p-4 font-bold text-emerald-600">+${e.cantidad}</td>
-                        <td class="p-4 text-xs text-slate-400">${e.usuario}</td>
-                    </tr>`;
+            const tE = document.getElementById("tabla-entradas-body");
+            if(tE) {
+                tE.innerHTML = "";
+                let docs = []; snap.forEach(d => docs.push(d.data()));
+                docs.sort((a,b) => b.timestamp - a.timestamp).forEach(e => {
+                    tE.innerHTML += `<tr class="border-b"><td class="p-4 text-slate-500">${e.fecha}</td><td class="p-4 font-bold uppercase text-emerald-800">${e.insumo}</td><td class="p-4 font-bold text-emerald-600">+${e.cantidad}</td><td class="p-4 text-xs text-slate-400">${e.usuario}</td></tr>`;
                 });
             }
         });
-
         onSnapshot(collection(db, "usuarios"), snap => {
             const list = document.getElementById("lista-usuarios-db");
             if(list) {
                 list.innerHTML = "";
-                snap.forEach(d => {
-                    list.innerHTML += `<div class="user-card flex justify-between items-center"><div><b>${d.id}</b><br><small class="text-slate-400">${d.data().rol}</small></div><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`;
-                });
+                snap.forEach(d => list.innerHTML += `<div class="user-card flex justify-between items-center"><div><b>${d.id}</b><br><small>${d.data().rol}</small></div><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div>`);
             }
         });
     }
