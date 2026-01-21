@@ -8,21 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .input-light { width: 100%; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; outline: none; transition: all 0.3s; }
-        .input-light:focus { background-color: #fff; border-color: #6366f1; ring: 2px; ring-color: #e0e7ff; }
-        .card-metrica { background: white; padding: 1.5rem; border-radius: 1.5rem; border: 1px solid #f1f5f9; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
-        .card-metrica span { font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-        .card-metrica h2 { font-size: 2.25rem; font-weight: 800; margin-top: 0.5rem; color: #1e293b; }
-        .badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-        .status-pendiente { background: #fffbeb; color: #d97706; }
-        .status-aprobado { background: #f0fdf4; color: #16a34a; }
-        .status-rechazado { background: #fef2f2; color: #dc2626; }
-        .user-card { background: #f8fafc; padding: 1rem; border-radius: 1rem; border: 1px solid #e2e8f0; }
-        .notif-card { background: white; padding: 1rem; border-radius: 1rem; border: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-slate-50 text-slate-900">
 
@@ -86,7 +72,7 @@
                             <canvas id="userChart"></canvas>
                         </div>
                         <div class="bg-white p-6 rounded-3xl border shadow-sm">
-                            <h3 class="text-sm font-bold text-slate-400 uppercase mb-4">Consumo por Área</h3>
+                            <h3 class="text-sm font-bold text-slate-400 uppercase mb-4">Consumo por Sede</h3>
                             <canvas id="locationChart"></canvas>
                         </div>
                     </div>
@@ -111,8 +97,15 @@
 
                 <section id="pag-historial" class="view hidden space-y-8">
                     
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <h2 class="text-2xl font-bold">Historial de Movimientos</h2>
+                        <button onclick="descargarReporte()" class="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition flex items-center gap-2">
+                            <i class="fas fa-file-csv"></i> Descargar Reporte Completo
+                        </button>
+                    </div>
+
                     <div>
-                        <h2 class="text-2xl font-bold mb-4 text-indigo-900">Historial de Salidas (Pedidos)</h2>
+                        <h3 class="text-xl font-bold mb-4 text-indigo-900">Salidas (Pedidos)</h3>
                         <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto">
                             <table class="w-full text-left min-w-[700px]">
                                 <thead class="bg-slate-50 border-b">
@@ -120,7 +113,7 @@
                                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Fecha</th>
                                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Insumo</th>
                                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Cant.</th>
-                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase text-indigo-600">Destino</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase text-indigo-600">Sede</th>
                                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Solicitante</th>
                                         <th class="p-4 text-xs font-bold text-slate-500 uppercase">Estado</th>
                                     </tr>
@@ -131,7 +124,7 @@
                     </div>
 
                     <div>
-                        <h2 class="text-2xl font-bold mb-4 text-emerald-700">Historial de Entradas (Reabastecimiento)</h2>
+                        <h3 class="text-xl font-bold mb-4 text-emerald-700">Entradas (Reabastecimiento)</h3>
                         <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto">
                             <table class="w-full text-left min-w-[600px]">
                                 <thead class="bg-emerald-50 border-b border-emerald-100">
@@ -169,7 +162,15 @@
                     <div class="bg-white p-8 rounded-[2.5rem] border shadow-sm text-center">
                         <h2 class="text-2xl font-bold mb-6">Nueva Solicitud</h2>
                         <div class="space-y-4">
-                            <input id="sol-ubicacion" placeholder="Área Destino (Ej: Cocina, Oficina)" class="input-light">
+                            <select id="sol-ubicacion" class="input-light text-slate-700 font-bold">
+                                <option value="" disabled selected>Seleccionar Sede...</option>
+                                <option value="DC1">DC1</option>
+                                <option value="DC2">DC2</option>
+                                <option value="ONX">ONX</option>
+                                <option value="PDC1">PDC1</option>
+                                <option value="OCEANIA">OCEANIA</option>
+                            </select>
+                            
                             <select id="sol-insumo" class="input-light">
                                 <option value="">Seleccionar Insumo...</option>
                             </select>
