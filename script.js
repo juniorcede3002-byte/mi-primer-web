@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+// CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -19,7 +20,7 @@ let insumoChart = null;
 
 emailjs.init("2jVnfkJKKG0bpKN-U");
 
-// --- PERSISTENCIA DE SESIÓN ---
+// --- 1. PERSISTENCIA DE SESIÓN ---
 window.addEventListener('DOMContentLoaded', () => {
     const sesionGuardada = localStorage.getItem("fcilog_session");
     if (sesionGuardada) {
@@ -27,21 +28,34 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// --- LÓGICA DE NOTIFICACIONES ---
+// --- 2. NOTIFICACIONES ---
 window.solicitarPermisoNotificaciones = () => {
-    if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
+    if (!("Notification" in window)) {
+        return alert("Tu navegador no soporta notificaciones.");
+    }
+
+    if (Notification.permission === "granted") {
+        alert("¡Las notificaciones ya están activas!");
+        enviarNotificacionNavegador("FCILog System", "Prueba de notificación exitosa.");
+    } else {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                alert("Has activado las notificaciones correctamente.");
+                enviarNotificacionNavegador("FCILog System", "Te avisaremos cuando cambie el estado de tus pedidos.");
+            } else {
+                alert("No podremos enviarte avisos si deniegas el permiso.");
+            }
+        });
     }
 };
 
 const enviarNotificacionNavegador = (titulo, cuerpo) => {
     if ("Notification" in window && Notification.permission === "granted") {
-        // Icono genérico de caja
         new Notification(titulo, { body: cuerpo, icon: "https://cdn-icons-png.flaticon.com/512/679/679720.png" });
     }
 };
 
-// --- FUNCIONES GLOBALES ---
+// --- 3. FUNCIONES GLOBALES ---
 
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
@@ -72,7 +86,11 @@ function cargarSesion(datos) {
     configurarMenu();
     window.verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
     activarSincronizacion();
-    window.solicitarPermisoNotificaciones(); // Solicitar permiso al entrar
+    
+    // Solicitar permiso silenciosamente al entrar si no se ha denegado
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
 }
 
 window.cerrarSesion = () => {
@@ -98,7 +116,7 @@ window.toggleMenu = () => {
 window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
 window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
 
-// --- GESTIÓN DE STOCK ---
+// --- 4. GESTIÓN DE STOCK (ENTRADAS) ---
 window.agregarProducto = async () => {
     const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
     const c = parseInt(document.getElementById("cantidad-prod").value);
@@ -130,7 +148,7 @@ window.agregarProducto = async () => {
     }
 };
 
-// --- PROCESAR PEDIDOS ---
+// --- 5. PROCESAR PEDIDOS (SALIDAS) ---
 window.procesarSolicitud = async () => {
     const ins = document.getElementById("sol-insumo").value;
     const cant = parseInt(document.getElementById("sol-cantidad").value);
@@ -151,7 +169,7 @@ window.procesarSolicitud = async () => {
     enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo: ins, cantidad: cant, estado: "SOLICITUD NUEVA", ubicacion: ubi });
     alert("Solicitud enviada correctamente.");
     document.getElementById("sol-cantidad").value = "";
-    document.getElementById("sol-ubicacion").value = "";
+    document.getElementById("sol-ubicacion").value = ""; // Resetea el select
     
     window.verPagina(usuarioActual.rol === 'admin' ? 'solicitudes' : 'notificaciones');
 };
@@ -176,7 +194,7 @@ window.gestionarPedido = async (pid, accion, ins, cant) => {
     }
 };
 
-// --- EXPORTAR REPORTE CSV ---
+// --- 6. EXPORTAR REPORTE CSV ---
 window.descargarReporte = async () => {
     if(!confirm("¿Descargar historial completo en CSV?")) return;
 
@@ -221,13 +239,13 @@ window.crearUsuario = async () => {
 
 window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, col, id)); };
 
-// --- LÓGICA DE INTERFAZ ---
+// --- 7. LÓGICA DE INTERFAZ Y SINCRONIZACIÓN ---
 
 function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
     const isAdmin = usuarioActual.rol === 'admin';
     const rutas = isAdmin ? 
-        [{id:'stats', n:'Dashboard', i:'chart-line'}, {id:'stock', n:'Stock', i:'box'}, {id:'solicitar', n:'Pedido', i:'plus'}, {id:'solicitudes', n:'Pendientes', i:'bell'}, {id:'historial', n:'Historial', i:'clock'}, {id:'usuarios', n:'Usuarios', i:'users'}] :
+        [{id:'stats', n:'Dashboard', i:'chart-line'}, {id:'stock', n:'Stock', i:'box'}, {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'}, {id:'solicitudes', n:'Pendientes', i:'bell'}, {id:'historial', n:'Historial', i:'clock'}, {id:'usuarios', n:'Usuarios', i:'users'}] :
         [{id:'stock', n:'Stock', i:'eye'}, {id:'solicitar', n:'Pedir', i:'plus'}, {id:'notificaciones', n:'Mis Pedidos', i:'history'}];
 
     menu.innerHTML = rutas.map(r => `
@@ -265,18 +283,17 @@ function activarSincronizacion() {
         }
     });
 
-    // Escuchar Pedidos (y Notificar)
+    // Escuchar Pedidos (y disparar Notificaciones)
     onSnapshot(collection(db, "pedidos"), snap => {
         
-        // LOGICA DE NOTIFICACIONES (Solo cambios)
+        // DETECTAR CAMBIOS PARA NOTIFICAR
         snap.docChanges().forEach(change => {
             if (change.type === "modified") {
                 const p = change.doc.data();
-                // Si el pedido es del usuario actual y cambió de estado
                 if (usuarioActual && p.usuarioId === usuarioActual.id) {
                     enviarNotificacionNavegador(
                         `Pedido ${p.estado.toUpperCase()}`,
-                        `Tu solicitud de ${p.insumoNom.toUpperCase()} ha cambiado a: ${p.estado}`
+                        `Tu solicitud de ${p.insumoNom.toUpperCase()} ahora está: ${p.estado}`
                     );
                 }
             }
