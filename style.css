@@ -1,177 +1,102 @@
-/* --- Configuración de Base y Tipografía --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
-
 :root {
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --bg-app: #f8fafc;
-    --sidebar-width: 288px;
-}
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Inter', sans-serif;
-    -webkit-tap-highlight-color: transparent; /* Elimina el flash azul en móviles */
+    --primary: #3498db;
+    --secondary: #2c3e50;
+    --success: #27ae60;
+    --danger: #e74c3c;
+    --warning: #f39c12;
+    --light: #ecf0f1;
 }
 
 body {
-    background-color: var(--bg-app);
-    color: #0f172a;
-    line-height: 1.5;
-    overflow-x: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background-color: #f0f2f5;
+    margin: 0;
+    color: #333;
 }
 
-/* --- Animaciones de Transición --- */
-.view {
-    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.container {
+    max-width: 1100px;
+    margin: 20px auto;
+    padding: 0 20px;
 }
 
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.hidden { display: none !important; }
+
+nav {
+    background: var(--secondary);
+    color: white;
+    padding: 15px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-/* --- Componentes de Formulario --- */
-.input-light {
-    width: 100%;
-    padding: 0.85rem 1rem;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 1rem;
-    font-size: 16px; /* Evita el zoom automático en iOS */
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-.input-light:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-    outline: none;
-}
-
-/* --- Badges de Estado (Solicitudes) --- */
-.badge {
-    display: inline-flex;
+.nav-container {
+    max-width: 1100px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    padding: 0.35rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-    white-space: nowrap;
+    padding: 0 20px;
 }
 
-.status-pendiente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-.status-aprobado { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-.status-rechazado { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-.status-recibido { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
-.status-anomalia { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
-.status-devuelto { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-
-/* --- Tarjetas de Métricas (Dashboard) --- */
-.card-metrica {
+.card {
     background: white;
-    padding: 1.5rem;
-    border-radius: 1.5rem;
-    border: 1px solid #e2e8f0;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 25px;
 }
 
-.card-metrica:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
 }
 
-/* --- Scrollbar Personalizado --- */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+th { background: #f8f9fa; font-weight: 600; }
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: 0.3s;
 }
 
-::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 20px;
-    border: 2px solid var(--bg-app);
-}
+.btn-primary { background: var(--primary); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+.btn-success { background: var(--success); color: white; }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-}
-
-/* --- Ajustes de Tabla Responsiva --- */
-.table-container {
-    border-radius: 1rem;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-}
-
-table thead th {
-    background-color: #f8fafc;
-    color: #64748b;
-    font-weight: 600;
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-weight: bold;
 }
 
-/* --- Estilos de Selección de Insumos (+ / -) --- */
-#lista-pedido-items > div {
-    transition: background 0.2s;
+.pendiente { background: var(--warning); color: white; }
+.recibido { background: var(--success); color: white; }
+
+.edit-input {
+    width: 70px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
 
-#lista-pedido-items button {
-    transition: all 0.1s active;
+.user-list { list-style: none; padding: 0; }
+.user-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
 }
 
-#lista-pedido-items button:active {
-    transform: scale(0.9);
-}
-
-/* --- Media Queries Específicas --- */
-
-/* Ajustes para Móvil (hasta 1023px) */
-@media (max-width: 1023px) {
-    #sidebar {
-        box-shadow: 20px 0 50px rgba(0,0,0,0.1);
-    }
-    
-    .view {
-        padding-bottom: 5rem; /* Espacio extra abajo para que nada se corte */
-    }
-
-    /* Modales a pantalla casi completa en móvil */
-    #modal-insumo > div, #modal-anomalia > div {
-        width: 95%;
-        margin: 10px;
-        padding: 1.5rem;
-    }
-}
-
-/* Ajustes para Tablets y PC (desde 1024px) */
-@media (min-width: 1024px) {
-    main {
-        padding-top: 2rem;
-    }
-}
-
-/* --- Utilidades Extras --- */
-.blur-bg {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.shadow-soft {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
+.table-responsive { overflow-x: auto; }
