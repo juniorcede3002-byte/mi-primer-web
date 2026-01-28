@@ -1,146 +1,180 @@
-// --- BASE DE DATOS LOCAL ---
+// --- BASE DE DATOS LOCAL (Simulada con LocalStorage) ---
 let insumos = JSON.parse(localStorage.getItem('insumos')) || [
-    { id: 1, nombre: "Papel Bond A4", stock: 120, precio: 4.50, stockMinimo: 20 },
-    { id: 2, nombre: "Tóner Láser HP", stock: 8, precio: 85.00, stockMinimo: 2 }
+    { id: 1, nombre: "Papel Bond A4", stock: 150, precio: 5.00, stockMinimo: 20 },
+    { id: 2, nombre: "Tóner HP 85A", stock: 12, precio: 60.00, stockMinimo: 3 }
 ];
 
 let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [
-    { user: "admin", nombre: "Administrador General", rol: "admin" },
-    { user: "applicant", nombre: "Área de Compras", rol: "applicant" }
+    { id: 1, nombre: "Carlos Admin", user: "admin", pass: "123", rol: "admin" },
+    { id: 2, nombre: "Ana Solicitante", user: "applicant", pass: "123", rol: "applicant" }
 ];
 
-let historial = JSON.parse(localStorage.getItem('historial')) || [
-    { id: 101, fecha: "2026-01-20", insumo: "Papel Bond A4", tipo: "Salida", cantidad: 5, estado: "Pendiente" }
+let solicitudes = JSON.parse(localStorage.getItem('solicitudes')) || [
+    { id: 101, fecha: "2026-01-26", insumo: "Papel Bond A4", cant: 10, estado: "Pendiente", user: "Ana" }
 ];
 
-// --- GESTIÓN DE SESIÓN (PERSISTENCIA) ---
+// --- PERSISTENCIA DE SESIÓN ---
+window.onload = function() {
+    const sesionActiva = JSON.parse(localStorage.getItem('sesionActiva'));
+    if (sesionActiva) {
+        cargarInterfaz(sesionActiva);
+    }
+};
+
+// --- AUTENTICACIÓN ---
 function login() {
-    const userVal = document.getElementById('username').value.toLowerCase();
-    const userFound = usuarios.find(u => u.user === userVal);
+    const u = document.getElementById('username').value;
+    const p = document.getElementById('password').value;
+    const user = usuarios.find(usr => usr.user === u && usr.pass === p);
 
-    if (userFound) {
-        localStorage.setItem('sesionActiva', JSON.stringify(userFound));
-        initApp();
+    if (user) {
+        const sesion = { nombre: user.nombre, rol: user.rol, id: user.id };
+        localStorage.setItem('sesionActiva', JSON.stringify(sesion));
+        cargarInterfaz(sesion);
     } else {
-        alert("Usuario no válido");
+        alert("Credenciales incorrectas");
     }
 }
 
 function logout() {
     localStorage.removeItem('sesionActiva');
-    location.reload();
+    window.location.reload();
 }
 
-function initApp() {
-    const sesion = JSON.parse(localStorage.getItem('sesionActiva'));
-    if (!sesion) return;
-
-    // Mostrar UI según rol
+// --- CONTROL DE VISTAS ---
+function cargarInterfaz(sesion) {
     document.getElementById('login-section').classList.add('hidden');
-    document.getElementById('main-nav').classList.remove('hidden');
-    document.getElementById('welcome-msg').innerText = `Usuario: ${sesion.nombre} | Rol: ${sesion.rol.toUpperCase()}`;
+    document.getElementById('navbar').classList.remove('hidden');
+    document.getElementById('user-display').innerText = `👤 ${sesion.nombre} | Rol: ${sesion.rol}`;
 
     if (sesion.rol === 'admin') {
-        document.getElementById('admin-panel').classList.remove('hidden');
+        document.getElementById('admin-dashboard').classList.remove('hidden');
         renderAdmin();
     } else {
-        document.getElementById('applicant-panel').classList.remove('hidden');
+        document.getElementById('applicant-dashboard').classList.remove('hidden');
         renderApplicant();
     }
 }
 
-// --- FUNCIONES DE ADMINISTRADOR ---
+// --- LÓGICA DE ADMINISTRADOR ---
 function renderAdmin() {
-    // 1. Listado de Usuarios
-    const userDisplay = document.getElementById('user-list-display');
-    userDisplay.innerHTML = usuarios.map(u => `<li>👤 ${u.nombre} (ID: ${u.user})</li>`).join('');
-
-    // 2. Tabla de Insumos (con Ajuste de Precio y Stock Mínimo)
-    const insumosList = document.getElementById('admin-insumos-list');
-    insumosList.innerHTML = insumos.map(i => `
+    // 1. Insumos con Edición
+    const tbody = document.getElementById('admin-insumos-body');
+    tbody.innerHTML = insumos.map(i => `
         <tr>
-            <td>${i.nombre}</td>
-            <td><b>${i.stock}</b></td>
-            <td>$<input type="number" step="0.01" class="edit-input" id="p-${i.id}" value="${i.precio}"></td>
-            <td><input type="number" class="edit-input" id="m-${i.id}" value="${i.stockMinimo}"></td>
-            <td><button class="btn btn-primary" onclick="actualizarInsumo(${i.id})">Guardar</button></td>
+            <td><strong>${i.nombre}</strong></td>
+            <td>${i.stock}</td>
+            <td>$${i.precio.toFixed(2)}</td>
+            <td>${i.stockMinimo}</td>
+            <td>
+                <button class="btn btn-primary" onclick="toggleEdit(${i.id})">Ajustar</button>
+                <button class="btn" style="background:var(--danger); color:white" onclick="eliminarInsumo(${i.id})">🗑</button>
+                <div id="edit-${i.id}" class="hidden edit-panel">
+                    <input type="number" id="p-${i.id}" value="${i.precio}" step="0.1">
+                    <input type="number" id="s-${i.id}" value="${i.stockMinimo}">
+                    <button class="btn-success" onclick="guardarAjuste(${i.id})">OK</button>
+                </div>
+            </td>
         </tr>
     `).join('');
 
-    // 3. Historial de Movimientos
-    const historyList = document.getElementById('full-history-list');
-    historyList.innerHTML = historial.map(h => `
+    // 2. Usuarios
+    const userList = document.getElementById('user-list');
+    userList.innerHTML = usuarios.map(u => `<li>${u.nombre} (${u.rol})</li>`).join('');
+
+    // 3. Historial/Solicitudes
+    const historyBody = document.getElementById('history-body');
+    historyBody.innerHTML = solicitudes.map(s => `
         <tr>
-            <td>${h.fecha}</td>
-            <td>${h.insumo}</td>
-            <td>${h.tipo}</td>
-            <td>${h.cantidad}</td>
-            <td><span class="badge ${h.estado.toLowerCase()}">${h.estado}</span></td>
+            <td>${s.fecha}</td>
+            <td>${s.insumo}</td>
+            <td>${s.cant} und.</td>
+            <td><span class="badge ${s.estado.toLowerCase()}">${s.estado}</span></td>
             <td>
-                ${h.estado === 'Pendiente' ? `<button class="btn btn-success" onclick="cambiarEstado(${h.id}, 'Recibido')">Aprobar</button>` : '---'}
+                ${s.estado === 'Pendiente' ? 
+                `<button onclick="cambiarEstado(${s.id}, 'Recibido')">✅</button>
+                 <button onclick="cambiarEstado(${s.id}, 'Rechazado')">❌</button>` : '---'}
             </td>
         </tr>
     `).join('');
 }
 
-function actualizarInsumo(id) {
-    const nuevoPrecio = document.getElementById(`p-${id}`).value;
-    const nuevoMinimo = document.getElementById(`m-${id}`).value;
+function toggleEdit(id) {
+    document.getElementById(`edit-${id}`).classList.toggle('hidden');
+}
 
-    insumos = insumos.map(i => i.id === id ? {...i, precio: parseFloat(nuevoPrecio), stockMinimo: parseInt(nuevoMinimo)} : i);
-    saveAll();
-    alert("Insumo actualizado");
+function guardarAjuste(id) {
+    const p = parseFloat(document.getElementById(`p-${id}`).value);
+    const s = parseInt(document.getElementById(`s-${id}`).value);
+    const index = insumos.findIndex(i => i.id === id);
+    insumos[index].precio = p;
+    insumos[index].stockMinimo = s;
+    actualizarStorage();
+    renderAdmin();
+}
+
+function agregarInsumo() {
+    const nom = document.getElementById('new-name').value;
+    const stock = parseInt(document.getElementById('new-stock').value);
+    if(nom && stock) {
+        insumos.push({ id: Date.now(), nombre: nom, stock: stock, precio: 0, stockMinimo: 0 });
+        actualizarStorage();
+        renderAdmin();
+    }
+}
+
+function eliminarInsumo(id) {
+    insumos = insumos.filter(i => i.id !== id);
+    actualizarStorage();
     renderAdmin();
 }
 
 function cambiarEstado(id, nuevoEstado) {
-    historial = historial.map(h => h.id === id ? {...h, estado: nuevoEstado} : h);
-    saveAll();
+    const s = solicitudes.find(sol => sol.id === id);
+    if(s) s.estado = nuevoEstado;
+    actualizarStorage();
     renderAdmin();
 }
 
-// --- FUNCIONES DE SOLICITANTE ---
+// --- LÓGICA DE SOLICITANTE ---
 function renderApplicant() {
     const stockList = document.getElementById('applicant-stock-list');
     stockList.innerHTML = insumos.map(i => `
-        <tr>
-            <td>${i.nombre}</td>
-            <td>${i.stock}</td>
-            <td>$${i.precio}</td>
-            <td><button class="btn btn-primary" onclick="crearSolicitud('${i.nombre}')">Solicitar 1</button></td>
-        </tr>
+        <div class="card" style="padding:10px; border:1px solid #ddd">
+            <strong>${i.nombre}</strong><br>
+            Stock: ${i.stock} | Precio: $${i.precio}<br>
+            <button class="btn btn-success" onclick="solicitar(${i.id})">Solicitar</button>
+        </div>
     `).join('');
 
-    const reqList = document.getElementById('applicant-requests-list');
-    reqList.innerHTML = historial.map(h => `
-        <tr>
-            <td>${h.insumo}</td>
-            <td>${h.cantidad}</td>
-            <td><span class="badge ${h.estado.toLowerCase()}">${h.estado}</span></td>
-        </tr>
-    `).join('');
+    const reqBody = document.getElementById('applicant-requests-body');
+    const miSesion = JSON.parse(localStorage.getItem('sesionActiva'));
+    reqBody.innerHTML = solicitudes
+        .filter(s => s.user === miSesion.nombre.split(' ')[0]) // Filtro simple por nombre
+        .map(s => `<tr><td>${s.insumo}</td><td>${s.cant}</td><td>${s.estado}</td></tr>`).join('');
 }
 
-function crearSolicitud(nombreInsumo) {
-    const nuevaSol = {
-        id: Date.now(),
-        fecha: new Date().toLocaleDateString(),
-        insumo: nombreInsumo,
-        tipo: "Salida",
-        cantidad: 1,
-        estado: "Pendiente"
-    };
-    historial.push(nuevaSol);
-    saveAll();
-    renderApplicant();
+function solicitar(id) {
+    const ins = insumos.find(i => i.id === id);
+    const cant = prompt(`¿Cuántas unidades de ${ins.nombre} necesita?`);
+    if(cant > 0) {
+        const miSesion = JSON.parse(localStorage.getItem('sesionActiva'));
+        solicitudes.push({
+            id: Date.now(),
+            fecha: new Date().toLocaleDateString(),
+            insumo: ins.nombre,
+            cant: parseInt(cant),
+            estado: "Pendiente",
+            user: miSesion.nombre.split(' ')[0]
+        });
+        actualizarStorage();
+        renderApplicant();
+        alert("Solicitud enviada");
+    }
 }
 
-// --- UTILIDADES ---
-function saveAll() {
+function actualizarStorage() {
     localStorage.setItem('insumos', JSON.stringify(insumos));
-    localStorage.setItem('historial', JSON.stringify(historial));
     localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    localStorage.setItem('solicitudes', JSON.stringify(solicitudes));
 }
-
-// Arrancar al cargar la página
-window.onload = initApp;
