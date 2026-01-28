@@ -3,218 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario Pro 2026</title>
-    <style>
-        :root { --admin-color: #2c3e50; --applicant-color: #27ae60; --pending: #f39c12; --received: #27ae60; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f4f7f6; }
-        nav { background: var(--admin-color); color: white; padding: 1rem; display: flex; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background: #f8f9fa; }
-        .badge { padding: 5px 10px; border-radius: 4px; color: white; font-size: 0.8rem; }
-        .pendiente { background: var(--pending); }
-        .recibido { background: var(--received); }
-        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
-        .btn-edit { background: #3498db; color: white; }
-        .hidden { display: none; }
-        .edit-form { display: flex; gap: 10px; margin-top: 10px; padding: 10px; background: #eef2f3; border-radius: 5px; }
-    </style>
+    <title>Sistema de Inventario Pro - 2026</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<nav id="navbar" class="hidden">
-    <span id="user-info"></span>
-    <button class="btn" onclick="logout()" style="background:#e74c3c; color:white;">Cerrar Sesión</button>
-</nav>
-
-<div class="container">
-    <div id="login-section" class="card">
-        <h2>Iniciar Sesión</h2>
-        <input type="text" id="username" placeholder="Usuario (admin o applicant)">
-        <button class="btn btn-edit" onclick="login()">Entrar</button>
-    </div>
-
-    <div id="admin-dashboard" class="hidden">
-        <h2>Panel de Administración</h2>
-        
-        <div class="card">
-            <h3>Ajustar Insumos (Precio y Stock Mínimo)</h3>
-            <table id="tabla-ajuste-insumos">
-                <thead>
-                    <tr>
-                        <th>Insumo</th>
-                        <th>Stock Actual</th>
-                        <th>Precio</th>
-                        <th>Stock Mínimo</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-insumos-admin"></tbody>
-            </table>
+    <nav id="main-nav" class="hidden">
+        <div class="nav-container">
+            <span id="welcome-msg"></span>
+            <button class="btn btn-danger" onclick="logout()">Cerrar Sesión</button>
         </div>
+    </nav>
 
-        <div class="card">
-            <h3>Historial de Movimientos</h3>
-            <table id="tabla-historial">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Insumo</th>
-                        <th>Tipo</th>
-                        <th>Cantidad</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="cuerpo-historial"></tbody>
-            </table>
-        </div>
+    <div class="container">
+        <section id="login-section" class="card">
+            <h2>Acceso al Sistema</h2>
+            <div class="form-group">
+                <input type="text" id="username" placeholder="Usuario (admin / applicant)">
+                <button class="btn btn-primary" onclick="login()">Ingresar</button>
+            </div>
+            <p><small>Prueba con: <b>admin</b> o <b>applicant</b></small></p>
+        </section>
 
-        <div class="card">
-            <h3>Usuarios Registrados</h3>
-            <ul id="lista-usuarios"></ul>
-        </div>
-    </div>
-
-    <div id="applicant-dashboard" class="hidden">
-        <h2>Panel de Solicitante</h2>
-        <div class="card">
-            <h3>Insumos Disponibles</h3>
-            <div id="stock-applicant"></div>
-        </div>
-        <div class="card">
-            <h3>Mis Solicitudes</h3>
-            <table id="tabla-solicitudes-app">
-                <tbody id="cuerpo-solicitudes-app"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<script>
-// --- DATOS INICIALES (Simulando Base de Datos) ---
-let insumos = JSON.parse(localStorage.getItem('insumos')) || [
-    { id: 1, nombre: "Resma de Papel", stock: 100, precio: 5.50, stockMinimo: 10 },
-    { id: 2, nombre: "Tóner Negro", stock: 5, precio: 45.00, stockMinimo: 2 }
-];
-
-let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [
-    { id: 1, nombre: "Admin General", user: "admin", rol: "admin" },
-    { id: 2, nombre: "Juan Solicitante", user: "applicant", rol: "applicant" }
-];
-
-let historial = JSON.parse(localStorage.getItem('historial')) || [
-    { fecha: "2026-01-25", insumo: "Resma de Papel", tipo: "Entrada", cantidad: 50, estado: "Recibido" },
-    { fecha: "2026-01-26", insumo: "Tóner Negro", tipo: "Salida", cantidad: 1, estado: "Pendiente" }
-];
-
-// --- PERSISTENCIA DE SESIÓN ---
-window.onload = () => {
-    const sesion = JSON.parse(localStorage.getItem('sesionActiva'));
-    if (sesion) {
-        mostrarInterfaz(sesion.rol, sesion.nombre);
-    }
-};
-
-function login() {
-    const userVal = document.getElementById('username').value;
-    const userFound = usuarios.find(u => u.user === userVal);
-
-    if (userFound) {
-        const sesion = { rol: userFound.rol, nombre: userFound.nombre };
-        localStorage.setItem('sesionActiva', JSON.stringify(sesion));
-        mostrarInterfaz(userFound.rol, userFound.nombre);
-    } else {
-        alert("Usuario no encontrado (usa 'admin' o 'applicant')");
-    }
-}
-
-function logout() {
-    localStorage.removeItem('sesionActiva');
-    location.reload();
-}
-
-// --- RENDERIZADO DE INTERFACES ---
-function mostrarInterfaz(rol, nombre) {
-    document.getElementById('login-section').classList.add('hidden');
-    document.getElementById('navbar').classList.remove('hidden');
-    document.getElementById('user-info').innerText = `Bienvenido: ${nombre} (${rol})`;
-
-    if (rol === 'admin') {
-        document.getElementById('admin-dashboard').classList.remove('hidden');
-        renderAdminData();
-    } else {
-        document.getElementById('applicant-dashboard').classList.remove('hidden');
-        renderApplicantData();
-    }
-}
-
-// --- LÓGICA DE ADMINISTRADOR ---
-function renderAdminData() {
-    // 1. Listar Usuarios
-    const listaU = document.getElementById('lista-usuarios');
-    listaU.innerHTML = usuarios.map(u => `<li><strong>${u.nombre}</strong> - Rol: ${u.rol}</li>`).join('');
-
-    // 2. Historial con Estados
-    const cuerpoH = document.getElementById('cuerpo-historial');
-    cuerpoH.innerHTML = historial.map(h => `
-        <tr>
-            <td>${h.fecha}</td>
-            <td>${h.insumo}</td>
-            <td>${h.tipo}</td>
-            <td>${h.cantidad}</td>
-            <td><span class="badge ${h.estado === 'Pendiente' ? 'pendiente' : 'recibido'}">${h.estado}</span></td>
-        </tr>
-    `).join('');
-
-    // 3. Ajuste de Insumos
-    const listaI = document.getElementById('lista-insumos-admin');
-    listaI.innerHTML = insumos.map(i => `
-        <tr>
-            <td>${i.nombre}</td>
-            <td>${i.stock}</td>
-            <td>$${i.precio}</td>
-            <td>${i.stockMinimo}</td>
-            <td>
-                <button class="btn btn-edit" onclick="abrirEditor(${i.id})">Ajustar</button>
-                <div id="edit-panel-${i.id}" class="edit-form hidden">
-                    <input type="number" id="p-${i.id}" placeholder="Precio" value="${i.precio}">
-                    <input type="number" id="s-${i.id}" placeholder="Mínimo" value="${i.stockMinimo}">
-                    <button onclick="guardarAjuste(${i.id})">✔</button>
+        <section id="admin-panel" class="hidden">
+            <h1>Panel de Administración</h1>
+            
+            <div class="dashboard-grid">
+                <div class="card">
+                    <h3>Gestión de Insumos (Precio y Stock Mínimo)</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Insumo</th>
+                                    <th>Stock</th>
+                                    <th>Precio</th>
+                                    <th>Mínimo</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-insumos-list"></tbody>
+                        </table>
+                    </div>
                 </div>
-            </td>
-        </tr>
-    `).join('');
-}
 
-function abrirEditor(id) {
-    const panel = document.getElementById(`edit-panel-${id}`);
-    panel.classList.toggle('hidden');
-}
+                <div class="card">
+                    <h3>Usuarios del Sistema</h3>
+                    <ul id="user-list-display" class="user-list"></ul>
+                </div>
+            </div>
 
-function guardarAjuste(id) {
-    const nuevoPrecio = document.getElementById(`p-${id}`).value;
-    const nuevoMin = document.getElementById(`s-${id}`).value;
-    
-    insumos = insumos.map(i => {
-        if(i.id === id) {
-            return { ...i, precio: parseFloat(nuevoPrecio), stockMinimo: parseInt(nuevoMin) };
-        }
-        return i;
-    });
+            <div class="card">
+                <h3>Historial de Entradas y Salidas</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Insumo</th>
+                                <th>Tipo</th>
+                                <th>Cant.</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="full-history-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
 
-    localStorage.setItem('insumos', JSON.stringify(insumos));
-    alert("Insumo actualizado correctamente");
-    renderAdminData();
-}
+        <section id="applicant-panel" class="hidden">
+            <h1>Panel de Solicitante</h1>
+            
+            <div class="card">
+                <h3>Insumos Disponibles y Pedidos</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Insumo</th>
+                                <th>Stock</th>
+                                <th>Precio</th>
+                                <th>Solicitar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="applicant-stock-list"></tbody>
+                    </table>
+                </div>
+            </div>
 
-// --- LÓGICA DE SOLICITANTE ---
-function renderApplicantData() {
-    const stockDiv = document.getElementById('stock-applicant');
-    stockDiv.innerHTML = insumos.map(i => `<p>${i.nombre} - Disponible: <strong>${i.stock}</strong></p>`).join('');
-}
-</script>
+            <div class="card">
+                <h3>Estado de mis Solicitudes</h3>
+                <div class="table-responsive">
+                    <table id="my-requests-table">
+                        <thead>
+                            <tr>
+                                <th>Insumo</th>
+                                <th>Cantidad</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="applicant-requests-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
 
+    <script src="script.js"></script>
 </body>
 </html>
