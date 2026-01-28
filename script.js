@@ -1,180 +1,260 @@
-// --- BASE DE DATOS LOCAL (Simulada con LocalStorage) ---
-let insumos = JSON.parse(localStorage.getItem('insumos')) || [
-    { id: 1, nombre: "Papel Bond A4", stock: 150, precio: 5.00, stockMinimo: 20 },
-    { id: 2, nombre: "Tóner HP 85A", stock: 12, precio: 60.00, stockMinimo: 3 }
-];
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [
-    { id: 1, nombre: "Carlos Admin", user: "admin", pass: "123", rol: "admin" },
-    { id: 2, nombre: "Ana Solicitante", user: "applicant", pass: "123", rol: "applicant" }
-];
+const firebaseConfig = {
+    apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
+    authDomain: "mi-web-db.firebaseapp.com",
+    projectId: "mi-web-db",
+    storageBucket: "mi-web-db.appspot.com"
+};
 
-let solicitudes = JSON.parse(localStorage.getItem('solicitudes')) || [
-    { id: 101, fecha: "2026-01-26", insumo: "Papel Bond A4", cant: 10, estado: "Pendiente", user: "Ana" }
-];
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let usuarioActual = null;
+let stockChart = null, userChart = null, locationChart = null, insumoChart = null;
 
 // --- PERSISTENCIA DE SESIÓN ---
-window.onload = function() {
-    const sesionActiva = JSON.parse(localStorage.getItem('sesionActiva'));
-    if (sesionActiva) {
-        cargarInterfaz(sesionActiva);
+window.addEventListener('DOMContentLoaded', () => {
+    const sesionGuardada = localStorage.getItem("fcilog_session");
+    if (sesionGuardada) {
+        cargarSesion(JSON.parse(sesionGuardada));
+    }
+});
+
+window.iniciarSesion = async () => {
+    const user = document.getElementById("login-user").value.trim().toLowerCase();
+    const pass = document.getElementById("login-pass").value.trim();
+
+    if (user === "admin" && pass === "1130") {
+        cargarSesion({ id: "admin", rol: "admin", email: "archivos@fcipty.com", nombre: "Administrador" });
+    } else {
+        const snap = await getDoc(doc(db, "usuarios", user));
+        if (snap.exists() && snap.data().pass === pass) {
+            cargarSesion({ id: user, ...snap.data() });
+        } else { alert("Usuario o clave incorrectos"); }
     }
 };
 
-// --- AUTENTICACIÓN ---
-function login() {
-    const u = document.getElementById('username').value;
-    const p = document.getElementById('password').value;
-    const user = usuarios.find(usr => usr.user === u && usr.pass === p);
-
-    if (user) {
-        const sesion = { nombre: user.nombre, rol: user.rol, id: user.id };
-        localStorage.setItem('sesionActiva', JSON.stringify(sesion));
-        cargarInterfaz(sesion);
-    } else {
-        alert("Credenciales incorrectas");
-    }
+function cargarSesion(datos) {
+    usuarioActual = datos;
+    localStorage.setItem("fcilog_session", JSON.stringify(datos));
+    document.getElementById("pantalla-login").classList.add("hidden");
+    document.getElementById("interfaz-app").classList.remove("hidden");
+    
+    if(datos.rol === 'admin') document.getElementById("btn-admin-stock")?.classList.remove("hidden");
+    
+    configurarMenu();
+    window.verPagina(datos.rol === 'admin' ? 'stats' : 'stock');
+    activarSincronizacion();
 }
 
-function logout() {
-    localStorage.removeItem('sesionActiva');
-    window.location.reload();
-}
+window.cerrarSesion = () => {
+    localStorage.removeItem("fcilog_session");
+    location.reload();
+};
 
-// --- CONTROL DE VISTAS ---
-function cargarInterfaz(sesion) {
-    document.getElementById('login-section').classList.add('hidden');
-    document.getElementById('navbar').classList.remove('hidden');
-    document.getElementById('user-display').innerText = `👤 ${sesion.nombre} | Rol: ${sesion.rol}`;
+// --- GESTIÓN DE INVENTARIO (CON PRECIO Y MÍNIMO) ---
+window.agregarProducto = async () => {
+    const n = document.getElementById("nombre-prod").value.trim().toLowerCase();
+    const c = parseInt(document.getElementById("cantidad-prod").value);
+    const p = parseFloat(document.getElementById("precio-prod").value) || 0;
+    const m = parseInt(document.getElementById("minimo-prod").value) || 0;
 
-    if (sesion.rol === 'admin') {
-        document.getElementById('admin-dashboard').classList.remove('hidden');
-        renderAdmin();
-    } else {
-        document.getElementById('applicant-dashboard').classList.remove('hidden');
-        renderApplicant();
-    }
-}
+    if(n && !isNaN(c)) {
+        await setDoc(doc(db, "inventario", n), { 
+            cantidad: c, 
+            precio: p, 
+            stockMinimo: m 
+        }, { merge: true });
 
-// --- LÓGICA DE ADMINISTRADOR ---
-function renderAdmin() {
-    // 1. Insumos con Edición
-    const tbody = document.getElementById('admin-insumos-body');
-    tbody.innerHTML = insumos.map(i => `
-        <tr>
-            <td><strong>${i.nombre}</strong></td>
-            <td>${i.stock}</td>
-            <td>$${i.precio.toFixed(2)}</td>
-            <td>${i.stockMinimo}</td>
-            <td>
-                <button class="btn btn-primary" onclick="toggleEdit(${i.id})">Ajustar</button>
-                <button class="btn" style="background:var(--danger); color:white" onclick="eliminarInsumo(${i.id})">🗑</button>
-                <div id="edit-${i.id}" class="hidden edit-panel">
-                    <input type="number" id="p-${i.id}" value="${i.precio}" step="0.1">
-                    <input type="number" id="s-${i.id}" value="${i.stockMinimo}">
-                    <button class="btn-success" onclick="guardarAjuste(${i.id})">OK</button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-
-    // 2. Usuarios
-    const userList = document.getElementById('user-list');
-    userList.innerHTML = usuarios.map(u => `<li>${u.nombre} (${u.rol})</li>`).join('');
-
-    // 3. Historial/Solicitudes
-    const historyBody = document.getElementById('history-body');
-    historyBody.innerHTML = solicitudes.map(s => `
-        <tr>
-            <td>${s.fecha}</td>
-            <td>${s.insumo}</td>
-            <td>${s.cant} und.</td>
-            <td><span class="badge ${s.estado.toLowerCase()}">${s.estado}</span></td>
-            <td>
-                ${s.estado === 'Pendiente' ? 
-                `<button onclick="cambiarEstado(${s.id}, 'Recibido')">✅</button>
-                 <button onclick="cambiarEstado(${s.id}, 'Rechazado')">❌</button>` : '---'}
-            </td>
-        </tr>
-    `).join('');
-}
-
-function toggleEdit(id) {
-    document.getElementById(`edit-${id}`).classList.toggle('hidden');
-}
-
-function guardarAjuste(id) {
-    const p = parseFloat(document.getElementById(`p-${id}`).value);
-    const s = parseInt(document.getElementById(`s-${id}`).value);
-    const index = insumos.findIndex(i => i.id === id);
-    insumos[index].precio = p;
-    insumos[index].stockMinimo = s;
-    actualizarStorage();
-    renderAdmin();
-}
-
-function agregarInsumo() {
-    const nom = document.getElementById('new-name').value;
-    const stock = parseInt(document.getElementById('new-stock').value);
-    if(nom && stock) {
-        insumos.push({ id: Date.now(), nombre: nom, stock: stock, precio: 0, stockMinimo: 0 });
-        actualizarStorage();
-        renderAdmin();
-    }
-}
-
-function eliminarInsumo(id) {
-    insumos = insumos.filter(i => i.id !== id);
-    actualizarStorage();
-    renderAdmin();
-}
-
-function cambiarEstado(id, nuevoEstado) {
-    const s = solicitudes.find(sol => sol.id === id);
-    if(s) s.estado = nuevoEstado;
-    actualizarStorage();
-    renderAdmin();
-}
-
-// --- LÓGICA DE SOLICITANTE ---
-function renderApplicant() {
-    const stockList = document.getElementById('applicant-stock-list');
-    stockList.innerHTML = insumos.map(i => `
-        <div class="card" style="padding:10px; border:1px solid #ddd">
-            <strong>${i.nombre}</strong><br>
-            Stock: ${i.stock} | Precio: $${i.precio}<br>
-            <button class="btn btn-success" onclick="solicitar(${i.id})">Solicitar</button>
-        </div>
-    `).join('');
-
-    const reqBody = document.getElementById('applicant-requests-body');
-    const miSesion = JSON.parse(localStorage.getItem('sesionActiva'));
-    reqBody.innerHTML = solicitudes
-        .filter(s => s.user === miSesion.nombre.split(' ')[0]) // Filtro simple por nombre
-        .map(s => `<tr><td>${s.insumo}</td><td>${s.cant}</td><td>${s.estado}</td></tr>`).join('');
-}
-
-function solicitar(id) {
-    const ins = insumos.find(i => i.id === id);
-    const cant = prompt(`¿Cuántas unidades de ${ins.nombre} necesita?`);
-    if(cant > 0) {
-        const miSesion = JSON.parse(localStorage.getItem('sesionActiva'));
-        solicitudes.push({
-            id: Date.now(),
-            fecha: new Date().toLocaleDateString(),
-            insumo: ins.nombre,
-            cant: parseInt(cant),
-            estado: "Pendiente",
-            user: miSesion.nombre.split(' ')[0]
+        await addDoc(collection(db, "entradas_stock"), {
+            insumo: n, cantidad: c, usuario: usuarioActual.id,
+            fecha: new Date().toLocaleString(), timestamp: Date.now()
         });
-        actualizarStorage();
-        renderApplicant();
-        alert("Solicitud enviada");
+        
+        cerrarModalInsumo();
+        alert("Insumo guardado correctamente.");
+    }
+};
+
+window.actualizarParametros = async (id) => {
+    const p = parseFloat(document.getElementById(`edit-p-${id}`).value);
+    const m = parseInt(document.getElementById(`edit-m-${id}`).value);
+    await updateDoc(doc(db, "inventario", id), { precio: p, stockMinimo: m });
+    alert("Valores actualizados");
+};
+
+// --- SINCRONIZACIÓN REAL-TIME ---
+function activarSincronizacion() {
+    // Escuchar Inventario
+    onSnapshot(collection(db, "inventario"), snap => {
+        const list = document.getElementById("lista-inventario");
+        const sel = document.getElementById("sol-insumo");
+        list.innerHTML = "";
+        if(sel) sel.innerHTML = '<option value="">Seleccionar Insumo...</option>';
+
+        snap.forEach(d => {
+            const data = d.data();
+            const id = d.id;
+            const esBajo = data.cantidad <= (data.stockMinimo || 0);
+
+            list.innerHTML += `
+                <div class="insumo-card ${esBajo ? 'border-red-500 bg-red-50' : ''}">
+                    <div class="flex justify-between">
+                        <b class="uppercase text-indigo-900">${id}</b>
+                        <span class="font-black text-xl">${data.cantidad}</span>
+                    </div>
+                    ${usuarioActual.rol === 'admin' ? `
+                        <div class="grid grid-cols-2 gap-2 mt-4 pt-4 border-t">
+                            <div><label class="text-[10px] uppercase font-bold text-slate-400">Precio ($)</label>
+                            <input id="edit-p-${id}" type="number" step="0.01" value="${data.precio || 0}" class="w-full bg-slate-100 p-2 rounded-lg text-sm"></div>
+                            <div><label class="text-[10px] uppercase font-bold text-slate-400">Mínimo</label>
+                            <input id="edit-m-${id}" type="number" value="${data.stockMinimo || 0}" class="w-full bg-slate-100 p-2 rounded-lg text-sm"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="actualizarParametros('${id}')" class="flex-1 bg-indigo-600 text-white text-[10px] py-2 rounded-lg font-bold mt-2">Guardar Cambios</button>
+                            <button onclick="eliminarDato('inventario','${id}')" class="bg-red-100 text-red-500 px-3 rounded-lg mt-2"><i class="fas fa-trash"></i></button>
+                        </div>
+                    ` : `<p class="text-xs text-slate-500">Stock disponible para pedidos.</p>`}
+                </div>`;
+            if(sel) sel.innerHTML += `<option value="${id}">${id.toUpperCase()}</option>`;
+        });
+    });
+
+    // Escuchar Historial y Usuarios (Solo Admin)
+    if(usuarioActual.rol === 'admin') {
+        onSnapshot(collection(db, "pedidos"), snap => {
+            const tHist = document.getElementById("tabla-historial-body");
+            const lAdmin = document.getElementById("lista-pendientes-admin");
+            if(tHist) tHist.innerHTML = "";
+            if(lAdmin) lAdmin.innerHTML = "";
+
+            snap.forEach(doc => {
+                const p = doc.data();
+                if(p.estado === 'pendiente') {
+                    lAdmin.innerHTML += `
+                        <div class="notif-card">
+                            <div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>${p.ubicacion} - ${p.usuarioId}</small></div>
+                            <div class="flex gap-2">
+                                <button onclick="gestionarPedido('${doc.id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold">Aprobar</button>
+                                <button onclick="gestionarPedido('${doc.id}','rechazar')" class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-bold">X</button>
+                            </div>
+                        </div>`;
+                } else {
+                    tHist.innerHTML += `
+                        <tr>
+                            <td class="p-4">${p.fecha.split(',')[0]}</td>
+                            <td class="p-4 font-bold uppercase">${p.insumoNom}</td>
+                            <td class="p-4">x${p.cantidad}</td>
+                            <td class="p-4 font-bold text-indigo-600">${p.ubicacion}</td>
+                            <td class="p-4 text-xs">${p.usuarioId}</td>
+                            <td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td>
+                        </tr>`;
+                }
+            });
+        });
+
+        onSnapshot(collection(db, "entradas_stock"), snap => {
+            const tE = document.getElementById("tabla-entradas-body");
+            if(tE) {
+                tE.innerHTML = "";
+                snap.forEach(d => {
+                    const e = d.data();
+                    tE.innerHTML += `<tr><td class="p-4 text-slate-400">${e.fecha}</td><td class="p-4 uppercase font-bold">${e.insumo}</td><td class="p-4 text-emerald-600 font-bold">+${e.cantidad}</td><td class="p-4 text-xs uppercase">${e.usuario}</td></tr>`;
+                });
+            }
+        });
+
+        onSnapshot(collection(db, "usuarios"), snap => {
+            const listU = document.getElementById("lista-usuarios-db");
+            if(listU) {
+                listU.innerHTML = "";
+                snap.forEach(d => {
+                    listU.innerHTML += `
+                        <div class="user-card">
+                            <div><b class="text-indigo-900">${d.id}</b><br><small class="uppercase text-slate-400">${d.data().rol}</small></div>
+                            <button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash-alt"></i></button>
+                        </div>`;
+                });
+            }
+        });
+    } else {
+        // Vista para el solicitante
+        onSnapshot(collection(db, "pedidos"), snap => {
+            const lUser = document.getElementById("lista-notificaciones");
+            if(lUser) {
+                lUser.innerHTML = "";
+                snap.forEach(d => {
+                    const p = d.data();
+                    if(p.usuarioId === usuarioActual.id) {
+                        lUser.innerHTML += `
+                            <div class="notif-card">
+                                <div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>${p.fecha}</small></div>
+                                <span class="badge status-${p.estado}">${p.estado}</span>
+                            </div>`;
+                    }
+                });
+            }
+        });
     }
 }
 
-function actualizarStorage() {
-    localStorage.setItem('insumos', JSON.stringify(insumos));
-    localStorage.setItem('usuarios', JSON.stringify(usuarios));
-    localStorage.setItem('solicitudes', JSON.stringify(solicitudes));
+// FUNCIONES DE APOYO
+window.toggleMenu = () => {
+    document.getElementById("sidebar").classList.toggle("-translate-x-full");
+    document.getElementById("sidebar-overlay").classList.toggle("hidden");
+};
+window.verPagina = (id) => {
+    document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
+    document.getElementById(`pag-${id}`).classList.remove("hidden");
+    if(window.innerWidth < 1024) toggleMenu();
+};
+window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
+window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
+window.eliminarDato = async (col, id) => { if(confirm("¿Seguro?")) await deleteDoc(doc(db, col, id)); };
+
+window.gestionarPedido = async (pid, accion, ins, cant) => {
+    const pRef = doc(db, "pedidos", pid);
+    if(accion === 'aprobar') {
+        const iRef = doc(db, "inventario", ins.toLowerCase());
+        const iSnap = await getDoc(iRef);
+        if(iSnap.exists() && iSnap.data().cantidad >= cant) {
+            await updateDoc(iRef, { cantidad: iSnap.data().cantidad - cant });
+            await updateDoc(pRef, { estado: "aprobado" });
+        } else { alert("Stock insuficiente"); }
+    } else { await updateDoc(pRef, { estado: "rechazado" }); }
+};
+
+window.crearUsuario = async () => {
+    const id = document.getElementById("new-user").value.trim().toLowerCase();
+    const p = document.getElementById("new-pass").value.trim();
+    const e = document.getElementById("new-email").value.trim();
+    const r = document.getElementById("new-role").value;
+    if(id && p) await setDoc(doc(db, "usuarios", id), { pass: p, email: e, rol: r });
+};
+
+function configurarMenu() {
+    const menu = document.getElementById("menu-dinamico");
+    const isAdmin = usuarioActual.rol === 'admin';
+    const rutas = isAdmin ? 
+        [{id:'stats', n:'Dashboard', i:'chart-line'}, {id:'stock', n:'Inventario', i:'box'}, {id:'solicitudes', n:'Pendientes', i:'bell'}, {id:'historial', n:'Historial', i:'clock'}, {id:'usuarios', n:'Usuarios', i:'users'}] :
+        [{id:'stock', n:'Stock', i:'eye'}, {id:'solicitar', n:'Pedir', i:'plus'}, {id:'notificaciones', n:'Mis Pedidos', i:'history'}];
+
+    menu.innerHTML = rutas.map(r => `
+        <button onclick="verPagina('${r.id}')" class="w-full flex items-center gap-3 p-4 text-slate-600 hover:bg-indigo-50 rounded-xl transition font-bold">
+            <i class="fas fa-${r.i} w-6"></i> ${r.n}
+        </button>`).join('');
 }
+
+window.procesarSolicitud = async () => {
+    const ins = document.getElementById("sol-insumo").value;
+    const cant = parseInt(document.getElementById("sol-cantidad").value);
+    const ubi = document.getElementById("sol-ubicacion").value;
+    if(!ins || !cant || !ubi) return alert("Completa los datos");
+    await addDoc(collection(db, "pedidos"), {
+        usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi,
+        estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now()
+    });
+    alert("Pedido enviado");
+};
