@@ -3,100 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Inventario Pro - 2026</title>
+    <title>Sistema de Inventario Pro 2026</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <nav id="main-nav" class="hidden">
+    <nav id="navbar" class="hidden">
         <div class="nav-container">
-            <span id="welcome-msg"></span>
-            <button class="btn btn-danger" onclick="logout()">Cerrar Sesión</button>
+            <span id="user-display"></span>
+            <button class="btn btn-logout" onclick="logout()">Cerrar Sesión</button>
         </div>
     </nav>
 
     <div class="container">
         <section id="login-section" class="card">
-            <h2>Acceso al Sistema</h2>
+            <h1>Control de Inventario</h1>
+            <p>Por favor, ingrese sus credenciales</p>
             <div class="form-group">
-                <input type="text" id="username" placeholder="Usuario (admin / applicant)">
+                <input type="text" id="username" placeholder="Usuario (admin o applicant)">
+                <input type="password" id="password" placeholder="Contraseña (123)">
                 <button class="btn btn-primary" onclick="login()">Ingresar</button>
             </div>
-            <p><small>Prueba con: <b>admin</b> o <b>applicant</b></small></p>
         </section>
 
-        <section id="admin-panel" class="hidden">
-            <h1>Panel de Administración</h1>
-            
-            <div class="dashboard-grid">
+        <section id="admin-dashboard" class="hidden">
+            <div class="grid">
                 <div class="card">
-                    <h3>Gestión de Insumos (Precio y Stock Mínimo)</h3>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Insumo</th>
-                                    <th>Stock</th>
-                                    <th>Precio</th>
-                                    <th>Mínimo</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-insumos-list"></tbody>
-                        </table>
+                    <h2>Gestión de Insumos</h2>
+                    <div class="form-add">
+                        <input type="text" id="new-name" placeholder="Nombre">
+                        <input type="number" id="new-stock" placeholder="Stock Inicial">
+                        <button class="btn btn-success" onclick="agregarInsumo()">Agregar Nuevo</button>
                     </div>
-                </div>
-
-                <div class="card">
-                    <h3>Usuarios del Sistema</h3>
-                    <ul id="user-list-display" class="user-list"></ul>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3>Historial de Entradas y Salidas</h3>
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Insumo</th>
-                                <th>Tipo</th>
-                                <th>Cant.</th>
-                                <th>Estado</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="full-history-list"></tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <section id="applicant-panel" class="hidden">
-            <h1>Panel de Solicitante</h1>
-            
-            <div class="card">
-                <h3>Insumos Disponibles y Pedidos</h3>
-                <div class="table-responsive">
-                    <table>
+                    <table id="table-insumos">
                         <thead>
                             <tr>
                                 <th>Insumo</th>
                                 <th>Stock</th>
                                 <th>Precio</th>
-                                <th>Solicitar</th>
+                                <th>Mínimo</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
-                        <tbody id="applicant-stock-list"></tbody>
+                        <tbody id="admin-insumos-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h2>Usuarios Registrados</h2>
+                    <ul id="user-list" class="user-list"></ul>
+                    <hr>
+                    <h2>Historial y Solicitudes</h2>
+                    <table class="table-small">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Insumo</th>
+                                <th>Tipo</th>
+                                <th>Estado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body"></tbody>
                     </table>
                 </div>
             </div>
+        </section>
 
-            <div class="card">
-                <h3>Estado de mis Solicitudes</h3>
-                <div class="table-responsive">
-                    <table id="my-requests-table">
+        <section id="applicant-dashboard" class="hidden">
+            <div class="grid">
+                <div class="card">
+                    <h2>Insumos Disponibles</h2>
+                    <div id="applicant-stock-list" class="stock-cards"></div>
+                </div>
+                <div class="card">
+                    <h2>Mis Solicitudes</h2>
+                    <table id="table-requests">
                         <thead>
                             <tr>
                                 <th>Insumo</th>
@@ -104,7 +86,7 @@
                                 <th>Estado</th>
                             </tr>
                         </thead>
-                        <tbody id="applicant-requests-list"></tbody>
+                        <tbody id="applicant-requests-body"></tbody>
                     </table>
                 </div>
             </div>
