@@ -100,25 +100,46 @@
 
                 <section id="pag-historial" class="view hidden space-y-8">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h2 class="text-2xl font-bold">Historial de Movimientos</h2>
+                        <h2 class="text-2xl font-bold">Historial y Movimientos</h2>
                         <button onclick="descargarReporte()" class="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-700 transition flex items-center gap-2">
                             <i class="fas fa-file-csv"></i> Descargar Reporte Completo
                         </button>
                     </div>
-                    <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto">
-                        <table class="w-full text-left min-w-[700px]">
-                            <thead class="bg-slate-50 border-b">
-                                <tr>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Fecha</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Insumo</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Cant.</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase text-indigo-600">Sede</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Solicitante</th>
-                                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-historial-body" class="divide-y text-sm"></tbody>
-                        </table>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 mb-3"><i class="fas fa-arrow-up text-red-400"></i> Salidas (Pedidos)</h3>
+                        <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto max-h-[400px] custom-scroll">
+                            <table class="w-full text-left min-w-[700px]">
+                                <thead class="bg-slate-50 border-b sticky top-0">
+                                    <tr>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Fecha</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Insumo</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Cant.</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase text-indigo-600">Sede</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Usuario</th>
+                                        <th class="p-4 text-xs font-bold text-slate-500 uppercase">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-historial-body" class="divide-y text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 mb-3"><i class="fas fa-arrow-down text-emerald-400"></i> Entradas (Reposiciones)</h3>
+                        <div class="bg-white rounded-3xl border shadow-sm overflow-x-auto max-h-[400px] custom-scroll">
+                            <table class="w-full text-left min-w-[700px]">
+                                <thead class="bg-emerald-50 border-b sticky top-0">
+                                    <tr>
+                                        <th class="p-4 text-xs font-bold text-emerald-600 uppercase">Fecha</th>
+                                        <th class="p-4 text-xs font-bold text-emerald-600 uppercase">Insumo</th>
+                                        <th class="p-4 text-xs font-bold text-emerald-600 uppercase">Cant.</th>
+                                        <th class="p-4 text-xs font-bold text-emerald-600 uppercase">Responsable</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-entradas-body" class="divide-y text-sm"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
