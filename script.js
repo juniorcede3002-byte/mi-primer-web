@@ -74,6 +74,7 @@ window.procesarSolicitudMultiple = async () => {
 
     if(!ubi || itemsParaPedir.length === 0) return alert("Seleccione sede y al menos un insumo.");
 
+    // Se envía uno por uno para que el admin los vea "1 por 1"
     for(const [insumo, cantidad] of itemsParaPedir) {
         await addDoc(collection(db, "pedidos"), {
             usuarioId: usuarioActual.id,
@@ -87,13 +88,13 @@ window.procesarSolicitudMultiple = async () => {
         enviarMail("archivos@fcipty.com", { usuario: usuarioActual.id, insumo, cantidad, estado: "NUEVA", ubicacion: ubi });
     }
 
-    alert("Pedido enviado con éxito.");
+    alert("✅ Solicitud enviada correctamente.");
     carritoGlobal = {};
     activarSincronizacion();
     window.verPagina(usuarioActual.rol === 'admin' ? 'solicitudes' : 'notificaciones');
 };
 
-// --- GESTIÓN DE USUARIOS (CREAR Y EDITAR) ---
+// --- GESTIÓN DE USUARIOS ---
 window.crearUsuario = async () => {
     const id = document.getElementById("new-user").value.trim().toLowerCase();
     const pass = document.getElementById("new-pass").value.trim();
@@ -103,7 +104,6 @@ window.crearUsuario = async () => {
     if(id && pass) {
         await setDoc(doc(db, "usuarios", id), { pass, email, rol });
         alert("Usuario guardado/actualizado correctamente");
-        // Limpiar campos
         document.getElementById("new-user").value = "";
         document.getElementById("new-pass").value = "";
         document.getElementById("new-email").value = "";
@@ -122,7 +122,7 @@ window.prepararEdicion = (id, pass, email, rol) => {
 
 // --- SINCRONIZACIÓN Y RENDERIZADO ---
 function activarSincronizacion() {
-    // 1. Inventario
+    // 1. Inventario (Stock)
     onSnapshot(collection(db, "inventario"), snap => {
         const listInv = document.getElementById("lista-inventario");
         const listPed = document.getElementById("contenedor-lista-pedidos");
@@ -145,7 +145,7 @@ function activarSincronizacion() {
                     ${usuarioActual.rol === 'admin' ? `<button onclick="eliminarDato('inventario','${n}')" class="text-red-400"><i class="fas fa-trash"></i></button>` : ''}
                 </div>`;
             
-            // Vista Solicitar (Lista con +/-)
+            // Vista Solicitar (Carrito)
             if(listPed && p.cantidad > 0) {
                 listPed.innerHTML += `
                     <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -167,7 +167,7 @@ function activarSincronizacion() {
         }
     });
 
-    // 2. Pedidos
+    // 2. Pedidos (Salidas y Pendientes)
     onSnapshot(collection(db, "pedidos"), snap => {
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
@@ -176,7 +176,7 @@ function activarSincronizacion() {
 
         snap.forEach(d => {
             const p = d.data();
-            // Panel Admin Pendientes
+            // Pendientes Admin
             if(usuarioActual.rol === 'admin' && p.estado === 'pendiente') {
                 lAdmin.innerHTML += `
                 <div class="bg-white p-5 rounded-2xl border flex justify-between items-center border-l-4 border-l-amber-400">
@@ -193,18 +193,39 @@ function activarSincronizacion() {
                     </div>
                 </div>`;
             }
-            // Historial General
+            // Historial Salidas
             if(p.estado !== 'pendiente' && tHist) {
                 tHist.innerHTML += `<tr class="border-b"><td class="p-4 text-slate-500 text-xs">${p.fecha}</td><td class="p-4 font-bold uppercase">${p.insumoNom}</td><td class="p-4">x${p.cantidad}</td><td class="p-4 text-indigo-600 font-bold">${p.ubicacion}</td><td class="p-4 text-xs font-bold text-slate-600">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td></tr>`;
             }
-            // Panel Usuario
+            // Notificaciones Usuario
             if(p.usuarioId === usuarioActual.id && lUser) {
                 lUser.innerHTML += `<div class="notif-card flex justify-between items-center p-4 bg-white rounded-2xl border"><div><b>${p.insumoNom.toUpperCase()} (x${p.cantidad})</b><br><small>${p.ubicacion}</small></div><span class="badge status-${p.estado}">${p.estado}</span></div>`;
             }
         });
     });
 
-    // 3. Usuarios (SOLO ADMIN) - Corrección para visualizar
+    // 3. Entradas (Reposiciones de Stock)
+    onSnapshot(collection(db, "entradas_stock"), snap => {
+        const tEnt = document.getElementById("tabla-entradas-body");
+        if(tEnt) {
+            tEnt.innerHTML = "";
+            let data = [];
+            snap.forEach(d => data.push(d.data()));
+            data.sort((a,b) => b.timestamp - a.timestamp); // Ordenar por fecha
+
+            data.forEach(e => {
+                tEnt.innerHTML += `
+                    <tr class="border-b">
+                        <td class="p-4 text-slate-500 text-xs">${e.fecha}</td>
+                        <td class="p-4 font-bold uppercase text-emerald-800">${e.insumo}</td>
+                        <td class="p-4 font-bold text-emerald-600">+${e.cantidad}</td>
+                        <td class="p-4 text-xs text-slate-400 font-bold">${e.usuario}</td>
+                    </tr>`;
+            });
+        }
+    });
+
+    // 4. Usuarios (Admin)
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "usuarios"), snap => {
             const listUsers = document.getElementById("lista-usuarios-db");
@@ -235,6 +256,51 @@ function activarSincronizacion() {
         });
     }
 }
+
+// --- DESCARGAR REPORTE COMPLETO (STOCK, ENTRADAS, SALIDAS) ---
+window.descargarReporte = async () => {
+    if(!confirm("¿Descargar reporte completo (Stock + Entradas + Salidas)?")) return;
+
+    // 1. Obtener Datos
+    const stockSnap = await getDocs(collection(db, "inventario"));
+    const entradasSnap = await getDocs(collection(db, "entradas_stock"));
+    const salidasSnap = await getDocs(collection(db, "pedidos"));
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+
+    // SECCIÓN 1: STOCK ACTUAL
+    csvContent += "=== STOCK ACTUAL ===\r\n";
+    csvContent += "INSUMO,CANTIDAD\r\n";
+    stockSnap.forEach(doc => {
+        csvContent += `${doc.id.toUpperCase()},${doc.data().cantidad}\r\n`;
+    });
+
+    // SECCIÓN 2: HISTORIAL ENTRADAS
+    csvContent += "\r\n=== HISTORIAL ENTRADAS (REPOSICIONES) ===\r\n";
+    csvContent += "FECHA,INSUMO,CANTIDAD,RESPONSABLE\r\n";
+    entradasSnap.forEach(doc => {
+        const d = doc.data();
+        csvContent += `${d.fecha.replace(/,/g, '')},${d.insumo},${d.cantidad},${d.usuario}\r\n`;
+    });
+
+    // SECCIÓN 3: HISTORIAL SALIDAS
+    csvContent += "\r\n=== HISTORIAL SALIDAS (PEDIDOS) ===\r\n";
+    csvContent += "FECHA,INSUMO,CANTIDAD,SEDE,USUARIO,ESTADO\r\n";
+    salidasSnap.forEach(doc => {
+        const d = doc.data();
+        if(d.estado !== 'pendiente') {
+            csvContent += `${d.fecha.replace(/,/g, '')},${d.insumoNom},${d.cantidad},${d.ubicacion},${d.usuarioId},${d.estado}\r\n`;
+        }
+    });
+
+    // Descarga
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(csvContent));
+    link.setAttribute("download", "Reporte_FCILog_Completo.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
 
 window.gestionarPedido = async (pid, accion, ins, cant) => {
     const pRef = doc(db, "pedidos", pid);
@@ -293,6 +359,7 @@ function renderChart(id, labels, data, title, color, instance, setInst) {
     }));
 }
 
-// Funciones Dummy para reportes y email (si faltan)
-window.descargarReporte = async () => { alert("Descargando CSV..."); }; 
-async function enviarMail(dest, info) { console.log("Email enviado a", dest); }
+async function enviarMail(dest, info) { 
+    // Asegúrate de usar tus IDs reales aquí si activas EmailJS
+    console.log("Email simulado a", dest); 
+}
