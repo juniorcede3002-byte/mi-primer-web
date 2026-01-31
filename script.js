@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// --- CONFIGURACIÓN (TUS LLAVES) ---
+// --- CONFIGURACIÓN DE LLAVES ---
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -9,16 +9,15 @@ const firebaseConfig = {
     storageBucket: "mi-web-db.appspot.com"
 };
 
-// CLOUDINARY CONFIG
+// CLOUDINARY
 const CLOUD_NAME = 'df79cjklp'; 
 const UPLOAD_PRESET = 'insumos'; 
 
-// EMAILJS CONFIG
+// EMAILJS (Configurado para TU plantilla de la imagen)
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; 
-const EMAIL_TEMPLATE_ALERT = 'template_dmqfty5'; 
+const EMAIL_TEMPLATE_ID = 'template_dmqfty5'; 
 const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
-// Correo del administrador
-const ADMIN_EMAIL = 'archivos@fcipty.com'; 
+const ADMIN_EMAIL = 'archivos@fcipty.com'; // Correo que recibe alertas de stock y nuevos pedidos
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -124,94 +123,51 @@ function configurarMenu() {
     menu.innerHTML = r.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
 }
 
-// --- FUNCIÓN MAESTRA DE NOTIFICACIONES (¡NUEVO DISEÑO CON EMOJIS!) ---
+// --- FUNCIÓN MAESTRA DE NOTIFICACIONES ---
+// Rellena EXACTAMENTE las variables de tu plantilla: {{id_solicitud}}, {{to_email}}, {{estado}}, {{mensaje}}
 async function enviarNotificacionGlobal(tipo, datos) {
-    let config = {
-        asunto: "",
-        titulo_principal: "",
-        mensaje_cuerpo: "",
-        to_email: ADMIN_EMAIL 
+    let params = {
+        to_email: datos.target_email || ADMIN_EMAIL, // Si no se especifica, va al admin
+        id_solicitud: "N/A",
+        estado: "INFO",
+        mensaje: ""
     };
 
     switch (tipo) {
         case 'nuevo_pedido':
-            config.asunto = `📦 Nuevo Pedido - ${datos.sede}`;
-            config.titulo_principal = "🚀 ¡Nueva Solicitud Entrante!";
-            config.mensaje_cuerpo = `
-Se ha registrado un nuevo movimiento en el sistema:
-
-👤 **Solicitante:** ${datos.usuario}
-🏢 **Sede:** ${datos.sede}
-📦 **Insumo:** ${datos.insumo.toUpperCase()}
-🔢 **Cantidad:** ${datos.cantidad} unidad(es)
-
-👉 Por favor, revisa la sección de 'Pendientes' para aprobar.`;
+            params.id_solicitud = `${datos.insumo.toUpperCase()} (x${datos.cantidad})`;
+            params.estado = "🟡 PENDIENTE";
+            params.mensaje = `El usuario ${datos.usuario} ha solicitado insumos para la sede ${datos.sede}.\nPor favor ingresa al sistema para gestionar la aprobación.`;
             break;
 
         case 'pedido_aprobado':
-            config.asunto = `🎉 Pedido Aprobado - ${datos.insumo}`;
-            config.titulo_principal = "✅ ¡Buenas noticias! Solicitud Aprobada";
-            config.mensaje_cuerpo = `
-Tu solicitud ha sido procesada exitosamente por la administración.
-
-📝 **Resumen del Pedido:**
-• Insumo: ${datos.insumo.toUpperCase()}
-• Cantidad Aprobada: ${datos.cantidad}
-• Destino: ${datos.sede}
-
-🚚 El despacho está en proceso. No olvides confirmar cuando lo recibas.`;
+            params.id_solicitud = `${datos.insumo.toUpperCase()} (x${datos.cantidad})`;
+            params.estado = "🟢 APROBADO";
+            params.mensaje = `Hola ${datos.usuario},\nTu solicitud para la sede ${datos.sede} ha sido aprobada exitosamente.\nEl despacho está en proceso. No olvides confirmar cuando lo recibas.`;
             break;
 
         case 'pedido_rechazado':
-            config.asunto = `🛑 Estado de Pedido - ${datos.insumo}`;
-            config.titulo_principal = "❌ Solicitud Rechazada";
-            config.mensaje_cuerpo = `
-Lo sentimos, tu solicitud no pudo ser procesada en este momento.
-
-📋 **Detalles:**
-• Solicitante: ${datos.usuario}
-• Insumo: ${datos.insumo.toUpperCase()}
-• Sede: ${datos.sede}
-
-ℹ️ Ponte en contacto con el administrador para más información.`;
+            params.id_solicitud = `${datos.insumo.toUpperCase()}`;
+            params.estado = "🔴 RECHAZADO";
+            params.mensaje = `Hola ${datos.usuario},\nLa solicitud para la sede ${datos.sede} no pudo ser procesada en este momento.\nContacta al administrador para más detalles.`;
             break;
 
         case 'stock_bajo':
-            config.asunto = `⚠️ ALERTA: Stock Crítico - ${datos.insumo}`;
-            config.titulo_principal = "📉 Alerta de Inventario Bajo";
-            config.mensaje_cuerpo = `
-¡Atención! Un producto ha alcanzado sus niveles mínimos.
-
-📦 **Producto:** ${datos.insumo.toUpperCase()}
-📊 **Stock Actual:** ${datos.cantidad_actual}
-🛑 **Mínimo Permitido:** ${datos.stock_minimo}
-
-⚡ Se recomienda gestionar el reabastecimiento lo antes posible.`;
+            params.id_solicitud = `ALERTA STOCK: ${datos.insumo.toUpperCase()}`;
+            params.estado = "⚠️ STOCK CRÍTICO";
+            params.mensaje = `Atención Admin,\nEl insumo ${datos.insumo} ha bajado de su nivel mínimo.\nStock Actual: ${datos.cantidad_actual}\nMínimo Configurado: ${datos.stock_minimo}`;
             break;
 
         case 'recibido':
-            config.asunto = `🤝 Entrega Exitosa - ${datos.sede}`;
-            config.titulo_principal = "📦 Insumos Recibidos Correctamente";
-            config.mensaje_cuerpo = `
-El ciclo de entrega se ha cerrado exitosamente.
-
-✅ **Confirmado por:** ${datos.usuario}
-📍 **Sede:** ${datos.sede}
-📦 **Insumo:** ${datos.insumo.toUpperCase()}
-
-El registro ha quedado guardado en el historial.`;
+            params.id_solicitud = `${datos.insumo.toUpperCase()}`;
+            params.estado = "🔵 RECIBIDO";
+            params.mensaje = `El usuario ${datos.usuario} confirmó la recepción correcta en la sede ${datos.sede}.\nEl ciclo ha sido cerrado exitosamente en el historial.`;
             break;
     }
 
     try {
-        await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ALERT, {
-            asunto: config.asunto,
-            titulo_principal: config.titulo_principal,
-            mensaje_cuerpo: config.mensaje_cuerpo,
-            to_email: config.to_email,
-            fecha: new Date().toLocaleString()
-        });
-        console.log(`✨ Correo enviado (${tipo})`);
+        await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, params);
+        console.log(`✉️ Email enviado (${tipo}) a ${params.to_email}`);
     } catch (error) {
         console.error("Error enviando email:", error);
     }
@@ -240,8 +196,10 @@ window.procesarSolicitudMultiple = async () => {
             fecha: new Date().toLocaleString(), 
             timestamp: Date.now() 
         });
-        // Notificación Bonita: Nuevo Pedido
-        enviarNotificacionGlobal('nuevo_pedido', { usuario: usuarioActual.id, insumo: ins, cantidad: cant, sede: ubi });
+        // Notificación al ADMIN sobre nuevo pedido
+        enviarNotificacionGlobal('nuevo_pedido', { 
+            usuario: usuarioActual.id, insumo: ins, cantidad: cant, sede: ubi 
+        });
     }));
 
     alert("✅ Pedido enviado."); 
@@ -258,6 +216,15 @@ window.gestionarPedido = async (pid, accion, ins) => {
     if(!pSnap.exists()) return;
     const pData = pSnap.data();
 
+    // Buscar email del solicitante
+    let emailSolicitante = "";
+    try {
+        const uSnap = await getDoc(doc(db, "usuarios", pData.usuarioId));
+        if(uSnap.exists() && uSnap.data().email) {
+            emailSolicitante = uSnap.data().email;
+        }
+    } catch (e) { console.log("No se pudo obtener email del usuario"); }
+
     if(accion === 'aprobar') {
         const inp = document.getElementById(`qty-${pid}`), cantFinal = inp ? parseInt(inp.value) : 0;
         if(isNaN(cantFinal) || cantFinal <= 0) return alert("Cantidad inválida.");
@@ -272,12 +239,16 @@ window.gestionarPedido = async (pid, accion, ins) => {
             await updateDoc(iRef, { cantidad: nuevaCantidad });
             await updateDoc(pRef, { estado: "aprobado", cantidad: cantFinal });
 
-            // Notificación Bonita: Aprobado
+            // Notificar al USUARIO que su pedido fue aprobado
             enviarNotificacionGlobal('pedido_aprobado', { 
-                usuario: pData.usuarioId, insumo: ins, cantidad: cantFinal, sede: pData.ubicacion 
+                usuario: pData.usuarioId, 
+                insumo: ins, 
+                cantidad: cantFinal, 
+                sede: pData.ubicacion,
+                target_email: emailSolicitante // Enviamos al correo del usuario
             });
 
-            // Notificación Bonita: Stock Bajo
+            // Notificar al ADMIN si hay stock bajo
             if (nuevaCantidad <= stockMin && stockMin > 0) {
                 enviarNotificacionGlobal('stock_bajo', { 
                     insumo: ins, cantidad_actual: nuevaCantidad, stock_minimo: stockMin 
@@ -287,9 +258,12 @@ window.gestionarPedido = async (pid, accion, ins) => {
         } else alert("Stock insuficiente.");
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
-        // Notificación Bonita: Rechazado
+        // Notificar al USUARIO que su pedido fue rechazado
         enviarNotificacionGlobal('pedido_rechazado', { 
-            usuario: pData.usuarioId, insumo: ins, sede: pData.ubicacion 
+            usuario: pData.usuarioId, 
+            insumo: ins, 
+            sede: pData.ubicacion,
+            target_email: emailSolicitante
         });
     }
 };
@@ -303,7 +277,7 @@ window.confirmarRecibido = async (pid) => {
         
         if(pSnap.exists()){
             const d = pSnap.data();
-            // Notificación Bonita: Recibido
+            // Notificar al ADMIN que se cerró el ciclo
             enviarNotificacionGlobal('recibido', { usuario: d.usuarioId, insumo: d.insumoNom, sede: d.ubicacion });
         }
     }
@@ -358,26 +332,33 @@ window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classLi
 window.cerrarModalDetalles = () => { document.getElementById("modal-detalles").classList.add("hidden"); document.getElementById('preview-img').classList.add('hidden'); document.getElementById('edit-prod-img').value = ''; };
 window.eliminarDato = async (c, i) => { if(confirm("¿Eliminar permanentemente?")) await deleteDoc(doc(db, c, i)); };
 
-// --- GESTIÓN DE USUARIOS ---
+// --- GESTIÓN DE USUARIOS (GUARDANDO CORREO CORRECTAMENTE) ---
 window.guardarUsuario = async () => {
     const editId = document.getElementById("edit-mode-id").value;
     const idInput = document.getElementById("new-user");
     const id = idInput.value.trim().toLowerCase();
     const pass = document.getElementById("new-pass").value.trim();
+    const email = document.getElementById("new-email").value.trim(); // Capturamos el correo
     const rol = document.getElementById("new-role").value;
-    if(!id || !pass) return alert("Faltan datos.");
+
+    if(!id || !pass) return alert("Faltan datos obligatorios (ID y Clave).");
     if(editId && editId !== id) return alert("No puedes cambiar el ID de un usuario existente.");
-    await setDoc(doc(db, "usuarios", id), { pass, rol }, { merge: true }); 
+    
+    // Guardamos incluyendo el email
+    await setDoc(doc(db, "usuarios", id), { pass, rol, email }, { merge: true }); 
+    
     alert(editId ? "Usuario actualizado." : "Usuario creado.");
     cancelarEdicionUsuario(); 
 };
 
-window.prepararEdicionUsuario = (id, pass, rol) => {
+window.prepararEdicionUsuario = (id, pass, rol, email) => {
     document.getElementById("edit-mode-id").value = id;
     document.getElementById("new-user").value = id;
     document.getElementById("new-user").disabled = true; 
     document.getElementById("new-pass").value = pass;
+    document.getElementById("new-email").value = email || ""; // Cargar correo si existe
     document.getElementById("new-role").value = rol;
+    
     const title = document.getElementById("titulo-form-usuario");
     if(title) title.innerHTML = `<i class="fas fa-user-edit"></i> Editando a: <span class="text-indigo-600">${id}</span>`;
     const btn = document.getElementById("btn-guardar-usuario");
@@ -392,6 +373,7 @@ window.cancelarEdicionUsuario = () => {
     document.getElementById("new-user").value = "";
     document.getElementById("new-user").disabled = false;
     document.getElementById("new-pass").value = "";
+    document.getElementById("new-email").value = "";
     document.getElementById("new-role").value = "user";
     const title = document.getElementById("titulo-form-usuario");
     if(title) title.innerHTML = `<i class="fas fa-user-plus"></i> Crear Nuevo Acceso`;
@@ -459,12 +441,12 @@ function activarSincronizacion() {
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "usuarios"), snap => {
             const l = document.getElementById("lista-usuarios-db");
-            if(l) { l.innerHTML = ""; snap.forEach(docSnap => { const u = docSnap.data(); const id = docSnap.id; l.innerHTML += `<div class="bg-white p-4 rounded-xl border border-slate-100 flex justify-between items-center group hover:shadow-md transition"><div><div class="flex items-center gap-2"><span class="font-bold text-slate-700">${id}</span><span class="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase text-slate-500">${u.rol}</span></div><p class="text-xs text-slate-400 font-mono mt-0.5">pass: ${u.pass}</p></div><div class="flex gap-2 opacity-0 group-hover:opacity-100 transition"><button onclick="prepararEdicionUsuario('${id}','${u.pass}','${u.rol}')" class="w-8 h-8 rounded bg-indigo-50 text-indigo-500 flex items-center justify-center hover:bg-indigo-500 hover:text-white"><i class="fas fa-pen text-xs"></i></button><button onclick="eliminarDato('usuarios','${id}')" class="w-8 h-8 rounded bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white"><i class="fas fa-trash-alt text-xs"></i></button></div></div>`; }); }
+            if(l) { l.innerHTML = ""; snap.forEach(docSnap => { const u = docSnap.data(); const id = docSnap.id; l.innerHTML += `<div class="bg-white p-4 rounded-xl border border-slate-100 flex justify-between items-center group hover:shadow-md transition"><div><div class="flex items-center gap-2"><span class="font-bold text-slate-700">${id}</span><span class="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-bold uppercase text-slate-500">${u.rol}</span></div><p class="text-xs text-slate-400 font-mono mt-0.5">pass: ${u.pass}</p></div><div class="flex gap-2 opacity-0 group-hover:opacity-100 transition"><button onclick="prepararEdicionUsuario('${id}','${u.pass}','${u.rol}', '${u.email || ''}')" class="w-8 h-8 rounded bg-indigo-50 text-indigo-500 flex items-center justify-center hover:bg-indigo-500 hover:text-white"><i class="fas fa-pen text-xs"></i></button><button onclick="eliminarDato('usuarios','${id}')" class="w-8 h-8 rounded bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white"><i class="fas fa-trash-alt text-xs"></i></button></div></div>`; }); }
         });
     }
 }
 
-// --- EXPORTAR A EXCEL REAL (.XLS) ---
+// --- REPORTES EN EXCEL (XLS) ---
 window.descargarReporte = async () => {
     if (!confirm("¿Descargar reporte en Excel (.xls)?")) return;
 
