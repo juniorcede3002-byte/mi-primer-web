@@ -37,31 +37,36 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupCloudinary() {
-    cloudinaryWidget = cloudinary.createUploadWidget({
-        cloudName: CLOUD_NAME, 
-        uploadPreset: UPLOAD_PRESET,
-        sources: ['local', 'camera'],
-        multiple: false,
-        cropping: true,
-        showSkipCropButton: false,
-        croppingAspectRatio: 1,
-        folder: 'fcilog_insumos',
-        styles: {
-            palette: {window: "#FFFFFF",windowBorder: "#90A0B3",tabIcon: "#5A67D8",menuIcons: "#5A67D8",textDark: "#2D3748",textLight: "#FFFFFF",link: "#5A67D8",action: "#5A67D8",inactiveTabIcon: "#A0AEC0",error: "#E53E3E",inProgress: "#4299E1",complete: "#48BB78",sourceBg: "#F7FAFC"},
-            fonts: {default: null, "'Plus Jakarta Sans', sans-serif": {url: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap",active: true}}
-        }
-    }, (error, result) => { 
-        if (!error && result && result.event === "success") { 
-            document.getElementById('edit-prod-img').value = result.info.secure_url;
-            const preview = document.getElementById('preview-img');
-            preview.src = result.info.secure_url;
-            preview.classList.remove('hidden');
-        }
-    });
-    const btnUpload = document.getElementById("upload_widget");
-    if(btnUpload) btnUpload.addEventListener("click", () => cloudinaryWidget.open(), false);
+    // Verificar si cloudinary está cargado
+    if (typeof cloudinary !== "undefined") {
+        cloudinaryWidget = cloudinary.createUploadWidget({
+            cloudName: CLOUD_NAME, 
+            uploadPreset: UPLOAD_PRESET,
+            sources: ['local', 'camera'],
+            multiple: false,
+            cropping: true,
+            showSkipCropButton: false,
+            croppingAspectRatio: 1,
+            folder: 'fcilog_insumos',
+            styles: {
+                palette: {window: "#FFFFFF",windowBorder: "#90A0B3",tabIcon: "#5A67D8",menuIcons: "#5A67D8",textDark: "#2D3748",textLight: "#FFFFFF",link: "#5A67D8",action: "#5A67D8",inactiveTabIcon: "#A0AEC0",error: "#E53E3E",inProgress: "#4299E1",complete: "#48BB78",sourceBg: "#F7FAFC"},
+                fonts: {default: null, "'Plus Jakarta Sans', sans-serif": {url: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&display=swap",active: true}}
+            }
+        }, (error, result) => { 
+            if (!error && result && result.event === "success") { 
+                const imgInput = document.getElementById('edit-prod-img');
+                const preview = document.getElementById('preview-img');
+                if(imgInput) imgInput.value = result.info.secure_url;
+                if(preview) {
+                    preview.src = result.info.secure_url;
+                    preview.classList.remove('hidden');
+                }
+            }
+        });
+        const btnUpload = document.getElementById("upload_widget");
+        if(btnUpload) btnUpload.addEventListener("click", () => cloudinaryWidget.open(), false);
+    }
 }
-
 
 // --- SESIÓN Y NAVEGACIÓN ---
 function cargarSesion(datos) {
@@ -74,7 +79,10 @@ function cargarSesion(datos) {
     if(infoDiv) infoDiv.innerHTML = `
         <div class="flex flex-col items-center"><div class="w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center text-indigo-500 mb-1 shadow-sm"><i class="fas fa-user"></i></div><span class="font-bold text-slate-700">${datos.id}</span><span class="text-[10px] uppercase font-bold text-indigo-400 bg-indigo-50 px-2 rounded-full mt-1">${datos.rol}</span></div>`;
 
-    if(datos.rol === 'admin' || datos.rol === 'manager') document.getElementById("btn-admin-stock")?.classList.remove("hidden");
+    if(datos.rol === 'admin' || datos.rol === 'manager') {
+        const btnStock = document.getElementById("btn-admin-stock");
+        if(btnStock) btnStock.classList.remove("hidden");
+    }
 
     configurarMenu();
     let inicio = 'stock';
@@ -120,13 +128,10 @@ function configurarMenu() {
         pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, 
         hs:{id:'historial',n:'Historial',i:'history'}, 
         us:{id:'usuarios',n:'Accesos',i:'users-cog'}, 
-        // IMPORTANTE: Este es el tab de recibir
         mp:{id:'notificaciones',n:'Mis Pedidos / Recibir',i:'shipping-fast'} 
     };
     
     let r = [];
-    
-    // AQUÍ ESTÁ EL AJUSTE: Se agregó 'i.mp' a TODOS los roles para que todos puedan recibir sus pedidos
     if(rol==='admin') {
         r=[i.st,i.sk,i.pd,i.pe,i.hs,i.us,i.mp]; 
     } else if(rol==='manager'||rol==='supervisor') {
@@ -141,14 +146,15 @@ function configurarMenu() {
 // --- LÓGICA DE PEDIDOS ---
 window.ajustarCantidad = (ins, d) => {
     const n = Math.max(0, (carritoGlobal[ins]||0) + d); carritoGlobal[ins] = n;
-    document.getElementById(`cant-${ins}`).innerText = n;
-    document.getElementById(`row-${ins}`).classList.toggle("border-indigo-500", n>0);
+    const cantEl = document.getElementById(`cant-${ins}`);
+    const rowEl = document.getElementById(`row-${ins}`);
+    if(cantEl) cantEl.innerText = n;
+    if(rowEl) rowEl.classList.toggle("border-indigo-500", n>0);
 };
 
 window.procesarSolicitudMultiple = async () => {
     const ubi = document.getElementById("sol-ubicacion").value, items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
     if(!ubi || items.length === 0) return alert("Seleccione sede y productos.");
-    // Redirigimos siempre a Mis Pedidos para que vean lo que acaban de pedir
     const red = 'notificaciones'; 
     await Promise.all(items.map(([ins, cant]) => addDoc(collection(db, "pedidos"), { usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now() })));
     alert("✅ Pedido enviado."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina(red);
@@ -170,7 +176,6 @@ window.gestionarPedido = async (pid, accion, ins) => {
             await updateDoc(iRef, { cantidad: nuevaCantidad });
             await updateDoc(pRef, { estado: "aprobado", cantidad: cantFinal });
 
-            // --- ALERTA DE STOCK BAJO ---
             if (nuevaCantidad <= stockMin && stockMin > 0) {
                 enviarAlertaStockBajo(ins, nuevaCantidad);
             }
@@ -180,17 +185,13 @@ window.gestionarPedido = async (pid, accion, ins) => {
 };
 
 async function enviarAlertaStockBajo(insumo, cantidadActual) {
-    console.log(`⚠️ ALERTA: Stock bajo para ${insumo}. Enviando correo...`);
     try {
         await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ALERT, {
             insumo: insumo.toUpperCase(),
             cantidad_actual: cantidadActual,
             fecha: new Date().toLocaleString()
         });
-        console.log("Correo de alerta enviado.");
-    } catch (error) {
-        console.error("Error enviando alerta EmailJS:", error);
-    }
+    } catch (error) { console.error("Error alerta EmailJS:", error); }
 }
 
 // --- ACCIONES USUARIO ---
@@ -244,12 +245,13 @@ window.abrirModalInsumo = () => document.getElementById("modal-insumo").classLis
 window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
 window.cerrarModalDetalles = () => {
     document.getElementById("modal-detalles").classList.add("hidden");
-    document.getElementById('preview-img').classList.add('hidden');
+    const prev = document.getElementById('preview-img');
+    if(prev) prev.classList.add('hidden');
     document.getElementById('edit-prod-img').value = '';
 };
 window.eliminarDato = async (c, i) => { if(confirm("¿Eliminar permanentemente?")) await deleteDoc(doc(db, c, i)); };
 
-// --- GESTIÓN DE USUARIOS (EDICIÓN) ---
+// --- GESTIÓN DE USUARIOS ---
 window.guardarUsuario = async () => {
     const editId = document.getElementById("edit-mode-id").value;
     const idInput = document.getElementById("new-user");
@@ -258,12 +260,9 @@ window.guardarUsuario = async () => {
     const rol = document.getElementById("new-role").value;
 
     if(!id || !pass) return alert("Faltan datos.");
-
-    // Si estamos editando y cambiaron el ID, advertir
-    if(editId && editId !== id) return alert("No puedes cambiar el ID de un usuario existente. Crea uno nuevo y borra el anterior.");
+    if(editId && editId !== id) return alert("No puedes cambiar el ID de un usuario existente.");
     
     await setDoc(doc(db, "usuarios", id), { pass, rol }, { merge: true }); 
-    
     alert(editId ? "Usuario actualizado." : "Usuario creado.");
     cancelarEdicionUsuario(); 
 };
@@ -303,7 +302,7 @@ function activarSincronizacion() {
     // 1. INVENTARIO
     onSnapshot(collection(db, "inventario"), snap => {
         const grid=document.getElementById("lista-inventario"), cart=document.getElementById("contenedor-lista-pedidos"), dl=document.getElementById("admin-stock-dl");
-        grid.innerHTML=""; if(cart)cart.innerHTML=""; if(dl)dl.innerHTML="";
+        if(grid) grid.innerHTML=""; if(cart)cart.innerHTML=""; if(dl)dl.innerHTML="";
         let totR=0, totS=0, lbls=[], dta=[];
 
         snap.forEach(ds => {
@@ -321,7 +320,8 @@ function activarSincronizacion() {
             const precioHtml = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
             const alertaMin = (p.stockMinimo && p.cantidad <= p.stockMinimo) ? `<i class="fas fa-exclamation-circle text-red-500 ml-2 animate-pulse" title="Stock Bajo (Mín: ${p.stockMinimo})"></i>` : '';
 
-            grid.innerHTML += `
+            if(grid) {
+                grid.innerHTML += `
                 <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition flex flex-col">
                     <div class="flex justify-between items-start mb-2">
                         ${imgHtml}
@@ -335,6 +335,7 @@ function activarSincronizacion() {
                         </div>
                     </div>
                 </div>`;
+            }
 
             if(cart && p.cantidad > 0) {
                 const enCarro = carritoGlobal[ds.id]||0, act = enCarro>0 ? "border-indigo-500 bg-indigo-50/50" : "border-transparent bg-white";
@@ -367,11 +368,10 @@ function activarSincronizacion() {
         s.forEach(ds=>{ 
             const p=ds.data(), id=ds.id; 
             if(p.estado==='aprobado'||p.estado==='recibido'){ls[p.ubicacion]=(ls[p.ubicacion]||0)+1;us[p.usuarioId]=(us[p.usuarioId]||0)+1;} 
-            
             const isStaff=['admin','manager','supervisor'].includes(usuarioActual.rol); 
             
-            // ADMIN / STAFF VIEW
-            if(isStaff && p.estado==='pendiente'){ 
+            // ADMIN VIEW
+            if(isStaff && p.estado==='pendiente' && la){ 
                 pc++; 
                 let cts=`<span class="badge bg-slate-100 text-slate-500">Solo Lectura</span>`; 
                 if(usuarioActual.rol!=='supervisor'){
@@ -381,13 +381,12 @@ function activarSincronizacion() {
             } 
             
             // HISTORY VIEW
-            if(p.estado!=='pendiente'&&th){ 
+            if(p.estado!=='pendiente' && th){ 
                 const nt=p.detalleIncidencia?`<br><span class="text-[9px] text-red-400 italic">"${p.detalleIncidencia}"</span>`:''; 
                 th.innerHTML+=`<tr class="hover:bg-slate-50 transition"><td class="p-4 text-slate-400 font-mono">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase text-slate-700">${p.insumoNom}</td><td class="p-4 text-slate-600">x${p.cantidad}</td><td class="p-4"><span class="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px]">${p.ubicacion}</span></td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span>${nt}</td></tr>`; 
             } 
             
-            // USER & RECEIVE VIEW (Mis Pedidos)
-            // IMPORTANTE: Ahora se muestra también si el usuario es el que lo pidió, independiente del rol
+            // USER VIEW
             if(p.usuarioId===usuarioActual.id && lu){ 
                 let acts=""; 
                 if(p.estado==='aprobado'){
@@ -435,6 +434,73 @@ function activarSincronizacion() {
     }
 }
 
-// --- REPORTES Y GRÁFICAS ---
-window.descargarReporte=async()=>{ if(!confirm("¿Generar CSV Completo?"))return; const [st,en,pe]=await Promise.all([getDocs(collection(db,"inventario")),getDocs(collection(db,"entradas_stock")),getDocs(collection(db,"pedidos"))]); let c="data:text/csv;charset=utf-8,--- STOCK ACTUAL ---\r\nINSUMO,CANTIDAD,PRECIO,STOCK_MIN\r\n"; st.forEach(d=>{const p=d.data(); c+=`${d.id.toUpperCase()},${p.cantidad},${p.precio||0},${p.stockMinimo||0}\r\n`;}); c+="\r\n--- ENTRADAS ---\r\nFECHA,INSUMO,CANTIDAD,USUARIO\r\n"; en.forEach(d=>{const x=d.data();c+=`${x.fecha.replace(/,/g,' ')},${x.insumo},${x.cantidad},${x.usuario}\r\n`;}); c+="\r\n--- PEDIDOS ---\r\nFECHA,INSUMO,CANTIDAD,SEDE,USUARIO,ESTADO,NOTA\r\n"; pe.forEach(d=>{const x=d.data();if(x.estado!=='pendiente')c+=`${x.fecha.replace(/,/g,' ')},${x.insumoNom},${x.cantidad},${x.ubicacion},${x.usuarioId},${x.estado},${x.detalleIncidencia||''}\r\n`;}); const l=document.createElement("a");l.href=encodeURI(c);l.download=`FCI_Reporte_${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(l);l.click();document.body.removeChild(l);};
+// --- REPORTES EN EXCEL (XLS) ---
+window.descargarReporte = async () => {
+    if (!confirm("¿Descargar reporte en Excel (.xls)?")) return;
+
+    // Obtener datos
+    const [st, en, pe] = await Promise.all([
+        getDocs(collection(db, "inventario")),
+        getDocs(collection(db, "entradas_stock")),
+        getDocs(collection(db, "pedidos"))
+    ]);
+
+    // Construir tabla HTML para Excel
+    let html = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="UTF-8"></head>
+        <body>
+            <h2 style="color: #4f46e5;">STOCK ACTUAL</h2>
+            <table border="1">
+                <thead style="background-color: #f3f4f6;">
+                    <tr><th>INSUMO</th><th>CANTIDAD</th><th>PRECIO</th><th>STOCK MIN</th></tr>
+                </thead>
+                <tbody>`;
+    
+    st.forEach(d => {
+        const p = d.data();
+        html += `<tr><td>${d.id.toUpperCase()}</td><td>${p.cantidad}</td><td>${p.precio||0}</td><td>${p.stockMinimo||0}</td></tr>`;
+    });
+
+    html += `</tbody></table><br><br>
+            <h2 style="color: #059669;">HISTORIAL DE ENTRADAS</h2>
+            <table border="1">
+                <thead style="background-color: #ecfdf5;">
+                    <tr><th>FECHA</th><th>INSUMO</th><th>CANTIDAD</th><th>USUARIO</th></tr>
+                </thead>
+                <tbody>`;
+    
+    en.forEach(d => {
+        const x = d.data();
+        html += `<tr><td>${x.fecha}</td><td>${x.insumo}</td><td>${x.cantidad}</td><td>${x.usuario}</td></tr>`;
+    });
+
+    html += `</tbody></table><br><br>
+            <h2 style="color: #d97706;">HISTORIAL DE PEDIDOS</h2>
+            <table border="1">
+                <thead style="background-color: #fffbeb;">
+                    <tr><th>FECHA</th><th>INSUMO</th><th>CANTIDAD</th><th>SEDE</th><th>USUARIO</th><th>ESTADO</th><th>NOTA</th></tr>
+                </thead>
+                <tbody>`;
+
+    pe.forEach(d => {
+        const x = d.data();
+        if(x.estado !== 'pendiente') {
+            html += `<tr><td>${x.fecha}</td><td>${x.insumoNom}</td><td>${x.cantidad}</td><td>${x.ubicacion}</td><td>${x.usuarioId}</td><td>${x.estado}</td><td>${x.detalleIncidencia||''}</td></tr>`;
+        }
+    });
+
+    html += `</tbody></table></body></html>`;
+
+    // Descargar
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FCI_Reporte_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
 function renderChart(id,l,d,t,c,i,s){const x=document.getElementById(id);if(!x)return;if(i)i.destroy();s(new Chart(x,{type:'bar',data:{labels:l,datasets:[{label:t,data:d,backgroundColor:c,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}}}}));}
