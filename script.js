@@ -15,7 +15,7 @@ const UPLOAD_PRESET = 'insumos';
 
 // EMAILJS CONFIG (AQUÍ ESTÁ LA CORRECCIÓN)
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; 
-const EMAIL_TEMPLATE_ID = 'template_mlcofoo'; // <--- ID CORREGIDO
+const EMAIL_TEMPLATE_ID = 'template_zglatmb'; // <--- ID CORREGIDO
 const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
 const ADMIN_EMAIL = 'archivos@fcipty.com'; 
 
