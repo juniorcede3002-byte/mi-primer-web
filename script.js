@@ -13,11 +13,11 @@ const firebaseConfig = {
 const CLOUD_NAME = 'df79cjklp'; 
 const UPLOAD_PRESET = 'insumos'; 
 
-// EMAILJS (Configurado para TU plantilla de la imagen)
+// EMAILJS (Configurado según tu imagen "Auto-Reply")
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; 
 const EMAIL_TEMPLATE_ID = 'template_dmqfty5'; 
 const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
-const ADMIN_EMAIL = 'archivos@fcipty.com'; // Correo que recibe alertas de stock y nuevos pedidos
+const ADMIN_EMAIL = 'archivos@fcipty.com'; 
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -123,51 +123,99 @@ function configurarMenu() {
     menu.innerHTML = r.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
 }
 
-// --- FUNCIÓN MAESTRA DE NOTIFICACIONES ---
-// Rellena EXACTAMENTE las variables de tu plantilla: {{id_solicitud}}, {{to_email}}, {{estado}}, {{mensaje}}
+// --- FUNCIÓN DE NOTIFICACIONES (Adaptada a TU IMAGEN) ---
 async function enviarNotificacionGlobal(tipo, datos) {
-    let params = {
-        to_email: datos.target_email || ADMIN_EMAIL, // Si no se especifica, va al admin
-        id_solicitud: "N/A",
-        estado: "INFO",
-        mensaje: ""
+    
+    // Configuración base
+    let config = {
+        asunto: "",
+        titulo_principal: "",
+        mensaje_cuerpo: "",
+        to_email: datos.target_email || ADMIN_EMAIL, // Usa el email dinámico o el del admin por defecto
+        fecha: new Date().toLocaleString()
     };
 
+    // Personalización del mensaje según el evento
     switch (tipo) {
         case 'nuevo_pedido':
-            params.id_solicitud = `${datos.insumo.toUpperCase()} (x${datos.cantidad})`;
-            params.estado = "🟡 PENDIENTE";
-            params.mensaje = `El usuario ${datos.usuario} ha solicitado insumos para la sede ${datos.sede}.\nPor favor ingresa al sistema para gestionar la aprobación.`;
+            config.asunto = `📦 Nuevo Pedido de ${datos.usuario}`;
+            config.titulo_principal = "🚀 ¡Nueva Solicitud Recibida!";
+            config.mensaje_cuerpo = `
+Se ha registrado un nuevo movimiento en el sistema:
+
+👤 **Solicitante:** ${datos.usuario}
+🏢 **Sede:** ${datos.sede}
+📦 **Insumo:** ${datos.insumo.toUpperCase()}
+🔢 **Cantidad:** ${datos.cantidad} unidad(es)
+
+👉 Por favor, revisa la sección de 'Pendientes' para aprobar.`;
             break;
 
         case 'pedido_aprobado':
-            params.id_solicitud = `${datos.insumo.toUpperCase()} (x${datos.cantidad})`;
-            params.estado = "🟢 APROBADO";
-            params.mensaje = `Hola ${datos.usuario},\nTu solicitud para la sede ${datos.sede} ha sido aprobada exitosamente.\nEl despacho está en proceso. No olvides confirmar cuando lo recibas.`;
+            config.asunto = `✅ Aprobado: ${datos.insumo}`;
+            config.titulo_principal = "✅ ¡Buenas noticias! Solicitud Aprobada";
+            config.mensaje_cuerpo = `
+Hola ${datos.usuario},
+
+Tu solicitud ha sido procesada exitosamente por la administración.
+
+📝 **Resumen del Pedido:**
+• Insumo: ${datos.insumo.toUpperCase()}
+• Cantidad Aprobada: ${datos.cantidad}
+• Destino: ${datos.sede}
+
+🚚 El despacho está en proceso. No olvides confirmar cuando lo recibas.`;
             break;
 
         case 'pedido_rechazado':
-            params.id_solicitud = `${datos.insumo.toUpperCase()}`;
-            params.estado = "🔴 RECHAZADO";
-            params.mensaje = `Hola ${datos.usuario},\nLa solicitud para la sede ${datos.sede} no pudo ser procesada en este momento.\nContacta al administrador para más detalles.`;
+            config.asunto = `❌ Rechazado: ${datos.insumo}`;
+            config.titulo_principal = "❌ Solicitud Rechazada";
+            config.mensaje_cuerpo = `
+Hola ${datos.usuario},
+
+Lo sentimos, tu solicitud para la sede ${datos.sede} no pudo ser procesada en este momento.
+
+ℹ️ Ponte en contacto con el administrador para más información.`;
             break;
 
         case 'stock_bajo':
-            params.id_solicitud = `ALERTA STOCK: ${datos.insumo.toUpperCase()}`;
-            params.estado = "⚠️ STOCK CRÍTICO";
-            params.mensaje = `Atención Admin,\nEl insumo ${datos.insumo} ha bajado de su nivel mínimo.\nStock Actual: ${datos.cantidad_actual}\nMínimo Configurado: ${datos.stock_minimo}`;
+            config.asunto = `⚠️ ALERTA STOCK: ${datos.insumo}`;
+            config.titulo_principal = "📉 Alerta de Inventario Bajo";
+            config.mensaje_cuerpo = `
+¡Atención Admin!
+
+El insumo ${datos.insumo.toUpperCase()} ha bajado de su nivel mínimo.
+
+📊 **Stock Actual:** ${datos.cantidad_actual}
+🛑 **Mínimo Configurado:** ${datos.stock_minimo}
+
+⚡ Se recomienda gestionar el reabastecimiento lo antes posible.`;
             break;
 
         case 'recibido':
-            params.id_solicitud = `${datos.insumo.toUpperCase()}`;
-            params.estado = "🔵 RECIBIDO";
-            params.mensaje = `El usuario ${datos.usuario} confirmó la recepción correcta en la sede ${datos.sede}.\nEl ciclo ha sido cerrado exitosamente en el historial.`;
+            config.asunto = `🤝 Entrega Confirmada - ${datos.sede}`;
+            config.titulo_principal = "📦 Insumos Recibidos Correctamente";
+            config.mensaje_cuerpo = `
+El ciclo de entrega se ha cerrado exitosamente.
+
+✅ **Confirmado por:** ${datos.usuario}
+📍 **Sede:** ${datos.sede}
+📦 **Insumo:** ${datos.insumo.toUpperCase()}
+
+El registro ha quedado guardado en el historial.`;
             break;
     }
 
+    // ENVÍO A EMAILJS
     try {
-        await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, params);
-        console.log(`✉️ Email enviado (${tipo}) a ${params.to_email}`);
+        await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, {
+            asunto: config.asunto,
+            titulo_principal: config.titulo_principal,
+            mensaje_cuerpo: config.mensaje_cuerpo,
+            fecha: config.fecha,
+            to_email: config.to_email
+        });
+        console.log(`✨ Correo (${tipo}) enviado a ${config.to_email}`);
     } catch (error) {
         console.error("Error enviando email:", error);
     }
@@ -196,7 +244,7 @@ window.procesarSolicitudMultiple = async () => {
             fecha: new Date().toLocaleString(), 
             timestamp: Date.now() 
         });
-        // Notificación al ADMIN sobre nuevo pedido
+        // Notificar al Admin
         enviarNotificacionGlobal('nuevo_pedido', { 
             usuario: usuarioActual.id, insumo: ins, cantidad: cant, sede: ubi 
         });
@@ -216,14 +264,14 @@ window.gestionarPedido = async (pid, accion, ins) => {
     if(!pSnap.exists()) return;
     const pData = pSnap.data();
 
-    // Buscar email del solicitante
+    // Intentar obtener el correo del solicitante
     let emailSolicitante = "";
     try {
         const uSnap = await getDoc(doc(db, "usuarios", pData.usuarioId));
         if(uSnap.exists() && uSnap.data().email) {
             emailSolicitante = uSnap.data().email;
         }
-    } catch (e) { console.log("No se pudo obtener email del usuario"); }
+    } catch(e) { console.log("Usuario sin email registrado"); }
 
     if(accion === 'aprobar') {
         const inp = document.getElementById(`qty-${pid}`), cantFinal = inp ? parseInt(inp.value) : 0;
@@ -239,16 +287,18 @@ window.gestionarPedido = async (pid, accion, ins) => {
             await updateDoc(iRef, { cantidad: nuevaCantidad });
             await updateDoc(pRef, { estado: "aprobado", cantidad: cantFinal });
 
-            // Notificar al USUARIO que su pedido fue aprobado
-            enviarNotificacionGlobal('pedido_aprobado', { 
-                usuario: pData.usuarioId, 
-                insumo: ins, 
-                cantidad: cantFinal, 
-                sede: pData.ubicacion,
-                target_email: emailSolicitante // Enviamos al correo del usuario
-            });
+            // Notificar al USUARIO (si tiene email)
+            if(emailSolicitante) {
+                enviarNotificacionGlobal('pedido_aprobado', { 
+                    usuario: pData.usuarioId, 
+                    insumo: ins, 
+                    cantidad: cantFinal, 
+                    sede: pData.ubicacion,
+                    target_email: emailSolicitante
+                });
+            }
 
-            // Notificar al ADMIN si hay stock bajo
+            // Alerta Stock Bajo al ADMIN
             if (nuevaCantidad <= stockMin && stockMin > 0) {
                 enviarNotificacionGlobal('stock_bajo', { 
                     insumo: ins, cantidad_actual: nuevaCantidad, stock_minimo: stockMin 
@@ -258,13 +308,15 @@ window.gestionarPedido = async (pid, accion, ins) => {
         } else alert("Stock insuficiente.");
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
-        // Notificar al USUARIO que su pedido fue rechazado
-        enviarNotificacionGlobal('pedido_rechazado', { 
-            usuario: pData.usuarioId, 
-            insumo: ins, 
-            sede: pData.ubicacion,
-            target_email: emailSolicitante
-        });
+        // Notificar Rechazo al USUARIO
+        if(emailSolicitante) {
+            enviarNotificacionGlobal('pedido_rechazado', { 
+                usuario: pData.usuarioId, 
+                insumo: ins, 
+                sede: pData.ubicacion,
+                target_email: emailSolicitante
+            });
+        }
     }
 };
 
@@ -277,7 +329,7 @@ window.confirmarRecibido = async (pid) => {
         
         if(pSnap.exists()){
             const d = pSnap.data();
-            // Notificar al ADMIN que se cerró el ciclo
+            // Notificar al Admin
             enviarNotificacionGlobal('recibido', { usuario: d.usuarioId, insumo: d.insumoNom, sede: d.ubicacion });
         }
     }
@@ -332,21 +384,20 @@ window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classLi
 window.cerrarModalDetalles = () => { document.getElementById("modal-detalles").classList.add("hidden"); document.getElementById('preview-img').classList.add('hidden'); document.getElementById('edit-prod-img').value = ''; };
 window.eliminarDato = async (c, i) => { if(confirm("¿Eliminar permanentemente?")) await deleteDoc(doc(db, c, i)); };
 
-// --- GESTIÓN DE USUARIOS (GUARDANDO CORREO CORRECTAMENTE) ---
+// --- GESTIÓN DE USUARIOS ---
 window.guardarUsuario = async () => {
     const editId = document.getElementById("edit-mode-id").value;
     const idInput = document.getElementById("new-user");
     const id = idInput.value.trim().toLowerCase();
     const pass = document.getElementById("new-pass").value.trim();
-    const email = document.getElementById("new-email").value.trim(); // Capturamos el correo
+    const email = document.getElementById("new-email").value.trim(); // Captura el email
     const rol = document.getElementById("new-role").value;
 
-    if(!id || !pass) return alert("Faltan datos obligatorios (ID y Clave).");
+    if(!id || !pass) return alert("Faltan datos.");
     if(editId && editId !== id) return alert("No puedes cambiar el ID de un usuario existente.");
     
-    // Guardamos incluyendo el email
+    // Guardamos ID, Clave, ROL y EMAIL
     await setDoc(doc(db, "usuarios", id), { pass, rol, email }, { merge: true }); 
-    
     alert(editId ? "Usuario actualizado." : "Usuario creado.");
     cancelarEdicionUsuario(); 
 };
@@ -356,7 +407,7 @@ window.prepararEdicionUsuario = (id, pass, rol, email) => {
     document.getElementById("new-user").value = id;
     document.getElementById("new-user").disabled = true; 
     document.getElementById("new-pass").value = pass;
-    document.getElementById("new-email").value = email || ""; // Cargar correo si existe
+    document.getElementById("new-email").value = email || ""; // Pone el email si existe
     document.getElementById("new-role").value = rol;
     
     const title = document.getElementById("titulo-form-usuario");
@@ -446,7 +497,7 @@ function activarSincronizacion() {
     }
 }
 
-// --- REPORTES EN EXCEL (XLS) ---
+// --- EXPORTAR A EXCEL REAL (.XLS) ---
 window.descargarReporte = async () => {
     if (!confirm("¿Descargar reporte en Excel (.xls)?")) return;
 
