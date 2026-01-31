@@ -1,346 +1,267 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
-    authDomain: "mi-web-db.firebaseapp.com",
-    projectId: "mi-web-db",
-    storageBucket: "mi-web-db.appspot.com"
-};
-
+const firebaseConfig = { /* COLOCA TUS CREDENCIALES AQUÍ */ };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let usuarioActual = null;
 let stockChart = null;
-let carritoGlobal = {}; 
+let carrito = {};
 
-window.addEventListener('DOMContentLoaded', () => {
-    const sesion = localStorage.getItem("fcilog_session");
-    if (sesion) cargarSesion(JSON.parse(sesion));
-});
-
-function cargarSesion(datos) {
-    usuarioActual = datos;
-    localStorage.setItem("fcilog_session", JSON.stringify(datos));
-    document.getElementById("pantalla-login").classList.add("hidden");
-    document.getElementById("interfaz-app").classList.remove("hidden");
-    document.getElementById("info-usuario").innerHTML = `<i class="fas fa-user-circle"></i> ${datos.id} <br> <span class="text-indigo-500">${datos.rol.toUpperCase()}</span>`;
-
-    if(['admin','manager'].includes(datos.rol)) {
-        document.getElementById("btn-admin-stock")?.classList.remove("hidden");
-    }
-
-    configurarMenu(datos.rol);
-    verPagina(datos.rol === 'user' ? 'stock' : 'stats');
-    activarSincronizacion();
-}
-
+// --- SESIÓN ---
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
     const pass = document.getElementById("login-pass").value.trim();
     
     if (user === "admin" && pass === "1130") {
-        cargarSesion({ id: "admin", rol: "admin", email: "archivos@fcipty.com" });
+        cargarSesion({ id: "admin", rol: "admin" });
     } else {
         const snap = await getDoc(doc(db, "usuarios", user));
         if (snap.exists() && snap.data().pass === pass) cargarSesion({ id: user, ...snap.data() });
-        else alert("Credenciales incorrectas");
+        else alert("Error de acceso");
     }
 };
 
-window.cerrarSesion = () => { localStorage.removeItem("fcilog_session"); location.reload(); };
+function cargarSesion(datos) {
+    usuarioActual = datos;
+    document.getElementById("pantalla-login").classList.add("hidden");
+    document.getElementById("interfaz-app").classList.remove("hidden");
+    document.getElementById("info-usuario").innerText = `${datos.id} | ${datos.rol}`;
+    
+    if (['admin', 'manager'].includes(datos.rol)) document.getElementById("btn-add-stock").classList.remove("hidden");
+    
+    configurarMenu();
+    activarSincronizacion();
+    verPagina(datos.rol === 'user' ? 'stock' : 'stats');
+}
 
+window.cerrarSesion = () => location.reload();
+
+// --- NAVEGACIÓN ---
 window.verPagina = (id) => {
     document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
-    document.getElementById(`pag-${id}`)?.classList.remove("hidden");
-    if(window.innerWidth < 1024) toggleMenu(false);
+    document.getElementById(`pag-${id}`).classList.remove("hidden");
 };
 
-window.toggleMenu = (open) => {
-    const side = document.getElementById("sidebar");
-    const over = document.getElementById("sidebar-overlay");
-    if(open === false) { side.classList.add("-translate-x-full"); over.classList.add("hidden"); }
-    else { side.classList.toggle("-translate-x-full"); over.classList.toggle("hidden"); }
-};
-
-function configurarMenu(rol) {
+function configurarMenu() {
     const menu = document.getElementById("menu-dinamico");
-    const m = {
-        stats: {id:'stats', n:'Dashboard', i:'chart-line'},
-        stock: {id:'stock', n:'Stock', i:'box'},
-        pedir: {id:'solicitar', n:'Realizar Pedido', i:'cart-plus'},
-        pendientes: {id:'solicitudes', n:'Pendientes', i:'bell'},
-        historial: {id:'historial', n:'Historial', i:'clock'},
-        usuarios: {id:'usuarios', n:'Usuarios', i:'users'},
-        mis_pedidos: {id:'notificaciones', n:'Mis Pedidos', i:'history'}
-    };
+    const r = usuarioActual.rol;
+    const items = [
+        { id: 'stats', n: 'Dashboard', i: 'chart-line', roles: ['admin', 'manager', 'supervisor'] },
+        { id: 'stock', n: 'Inventario', i: 'box', roles: ['admin', 'manager', 'supervisor', 'user'] },
+        { id: 'solicitar', n: 'Pedir', i: 'cart-plus', roles: ['admin', 'manager', 'supervisor', 'user'] },
+        { id: 'solicitudes', n: 'Pendientes', i: 'bell', roles: ['admin', 'manager', 'supervisor'] },
+        { id: 'usuarios', n: 'Usuarios', i: 'users', roles: ['admin'] },
+        { id: 'notificaciones', n: 'Mis Pedidos', i: 'history', roles: ['user'] }
+    ];
 
-    let rutas = [];
-    if(rol === 'admin') rutas = [m.stats, m.stock, m.pedir, m.pendientes, m.historial, m.usuarios];
-    else if(rol === 'manager') rutas = [m.stats, m.stock, m.pedir, m.pendientes, m.historial];
-    else if(rol === 'supervisor') rutas = [m.stats, m.stock, m.pedir, m.pendientes, m.historial];
-    else rutas = [m.stock, m.pedir, m.mis_pedidos];
-
-    menu.innerHTML = rutas.map(r => `
-        <button onclick="verPagina('${r.id}')" class="w-full flex items-center gap-3 p-4 text-slate-600 hover:bg-indigo-50 rounded-xl transition font-bold text-sm">
-            <i class="fas fa-${r.i} w-6 text-center"></i> ${r.n}
+    menu.innerHTML = items.filter(i => i.roles.includes(r)).map(i => `
+        <button onclick="verPagina('${i.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 rounded-xl transition font-bold">
+            <i class="fas fa-${i.i} w-5"></i> ${i.n}
         </button>`).join('');
 }
 
-// --- ACTUALIZAR STOCK ---
-window.agregarProducto = async () => {
-    // Normalizamos el nombre a minúsculas para el ID de Firebase
-    const rawNombre = document.getElementById("nombre-prod").value.trim();
-    const n = rawNombre.toLowerCase();
-    const c = parseInt(document.getElementById("cantidad-prod").value);
-
-    if(n && !isNaN(c) && c > 0) {
-        const docRef = doc(db, "inventario", n);
-        const snap = await getDoc(docRef);
-        
-        if (snap.exists()) await updateDoc(docRef, { cantidad: snap.data().cantidad + c });
-        else await setDoc(docRef, { cantidad: c });
-        
-        await addDoc(collection(db, "entradas_stock"), { 
-            insumo: n, cantidad: c, usuario: usuarioActual.id, 
-            fecha: new Date().toLocaleString(), timestamp: Date.now() 
-        });
-
-        alert(`Stock de ${n.toUpperCase()} actualizado.`);
-        cerrarModalInsumo();
-        document.getElementById("nombre-prod").value = "";
-        document.getElementById("cantidad-prod").value = "";
-    } else alert("Datos inválidos");
-};
-
-// --- SINCRONIZACIÓN (Aquí está la magia del Datalist) ---
+// --- LOGICA DE STOCK Y AUTOCOMPLETADO ---
 function activarSincronizacion() {
-    // 1. INVENTARIO Y AUTOCOMPLETADO
+    // Escuchar Inventario
     onSnapshot(collection(db, "inventario"), snap => {
         const listInv = document.getElementById("lista-inventario");
         const listPed = document.getElementById("contenedor-lista-pedidos");
-        const dataList = document.getElementById("lista-sugerencias"); // Referencia al datalist
+        const dataList = document.getElementById("lista-sugerencias");
         
         listInv.innerHTML = "";
-        if(listPed) listPed.innerHTML = "";
-        if(dataList) dataList.innerHTML = ""; // Limpiar sugerencias
+        listPed.innerHTML = "";
+        dataList.innerHTML = "";
 
-        let totStock = 0, lbs = [], vls = [];
+        let lbs = [], vls = [], total = 0;
 
         snap.forEach(d => {
-            const n = d.id; // El nombre en minúsculas (ID)
             const p = d.data();
-            totStock += p.cantidad;
-            lbs.push(n.toUpperCase());
+            const id = d.id;
+            total += p.cantidad;
+            lbs.push(id.toUpperCase());
             vls.push(p.cantidad);
 
-            // Agregar a la lista de sugerencias del Modal
-            if(dataList) {
-                const opt = document.createElement("option");
-                opt.value = n.toUpperCase(); 
-                dataList.appendChild(opt);
-            }
+            // Llenar Autocompletado
+            const opt = document.createElement("option");
+            opt.value = id.toUpperCase();
+            dataList.appendChild(opt);
 
-            // Cards de Stock
+            // Tarjeta de Stock con botón de edición
+            const esBajo = p.cantidad <= (p.stockMin || 0);
+            const btnEdit = ['admin', 'manager'].includes(usuarioActual.rol) ? 
+                `<button onclick="abrirEditorInsumo('${id}')" class="text-indigo-500 hover:bg-indigo-50 p-2 rounded-lg"><i class="fas fa-cog"></i></button>` : '';
+
             listInv.innerHTML += `
-                <div class="bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm">
-                    <div><b class="uppercase text-slate-700">${n}</b><p class="text-xs text-slate-400 font-bold">Stock: ${p.cantidad}</p></div>
-                    ${['admin','manager'].includes(usuarioActual.rol) ? `<button onclick="eliminarDato('inventario','${n}')" class="text-red-300 hover:text-red-500"><i class="fas fa-trash"></i></button>` : ''}
+                <div class="card-stock flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                        <img src="${p.img || 'https://placehold.co/100?text=📦'}" class="w-16 h-16 rounded-lg object-cover bg-slate-100">
+                        ${btnEdit}
+                    </div>
+                    <div>
+                        <b class="uppercase block text-sm">${id}</b>
+                        <p class="text-xs text-slate-400">$${p.precio || '0.00'}</p>
+                        <div class="mt-2 flex justify-between items-end">
+                            <span class="text-2xl font-black ${esBajo ? 'text-red-500' : 'text-slate-700'}">${p.cantidad}</span>
+                            <span class="text-[10px] font-bold text-slate-300 uppercase">Stock</span>
+                        </div>
+                    </div>
                 </div>`;
-            
-            // Items para Pedir
-            if(listPed && p.cantidad > 0) {
+
+            // Lista para pedir
+            if (p.cantidad > 0) {
                 listPed.innerHTML += `
-                    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <span class="font-bold uppercase text-xs text-slate-700 w-1/3">${n}</span>
-                        <div class="flex items-center gap-3 bg-white px-2 py-1 rounded-xl shadow-sm border">
-                            <button onclick="ajustarPedido('${n}', -1)" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold">-</button>
-                            <span id="cant-${n}" class="w-6 text-center font-bold text-indigo-600">${carritoGlobal[n] || 0}</span>
-                            <button onclick="ajustarPedido('${n}', 1)" class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 font-bold">+</button>
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border">
+                        <span class="font-bold text-xs uppercase">${id}</span>
+                        <div class="flex items-center gap-3">
+                            <button onclick="cambiarCant('${id}', -1)" class="w-8 h-8 rounded bg-white border">-</button>
+                            <span id="cant-${id}" class="w-5 text-center font-bold">${carrito[id] || 0}</span>
+                            <button onclick="cambiarCant('${id}', 1)" class="w-8 h-8 rounded bg-indigo-600 text-white">+</button>
                         </div>
                     </div>`;
             }
         });
 
-        if(['admin','manager','supervisor'].includes(usuarioActual.rol)) {
-            document.getElementById("metrica-total").innerText = snap.size;
-            document.getElementById("metrica-stock").innerText = totStock;
-            renderChart(lbs, vls);
-        }
+        document.getElementById("metrica-stock").innerText = total;
+        renderChart(lbs, vls);
     });
 
-    // 2. PEDIDOS Y NOTIFICACIONES
+    // Escuchar Solicitudes (Admin/Manager/Supervisor)
     onSnapshot(collection(db, "pedidos"), snap => {
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lUser = document.getElementById("lista-notificaciones");
-        const tHist = document.getElementById("tabla-historial-body");
-        
-        if(lAdmin) lAdmin.innerHTML = ""; 
-        if(lUser) lUser.innerHTML = ""; 
-        if(tHist) tHist.innerHTML = "";
+        if(lAdmin) lAdmin.innerHTML = "";
+        if(lUser) lUser.innerHTML = "";
 
         snap.forEach(d => {
             const p = d.data();
-            const id = d.id;
+            if (p.estado === 'pendiente' && lAdmin) {
+                const acciones = ['admin', 'manager'].includes(usuarioActual.rol) ? 
+                    `<div class="flex gap-2">
+                        <button onclick="gestionar('${d.id}', 'aprobar', '${p.insumo}', ${p.cantidad})" class="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs">Aprobar</button>
+                        <button onclick="gestionar('${d.id}', 'rechazar')" class="bg-red-50 text-red-500 px-3 py-1 rounded-lg text-xs">X</button>
+                    </div>` : '<span class="badge status-pendiente">Pendiente</span>';
 
-            // Historial General
-            if(p.estado !== 'pendiente' && tHist) {
-                tHist.innerHTML += `
-                <tr class="border-b">
-                    <td class="p-4 text-slate-400 text-[10px]">${p.fecha.split(',')[0]}</td>
-                    <td class="p-4 font-bold uppercase">${p.insumoNom}</td>
-                    <td class="p-4">x${p.cantidad}</td>
-                    <td class="p-4 text-xs font-bold text-slate-600">${p.usuarioId}</td>
-                    <td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td>
-                </tr>`;
-            }
-
-            // Panel de Aprobación
-            if(['admin','manager','supervisor'].includes(usuarioActual.rol) && p.estado === 'pendiente' && lAdmin) {
-                const canEdit = ['admin','manager'].includes(usuarioActual.rol);
                 lAdmin.innerHTML += `
-                <div class="bg-white p-4 rounded-2xl border flex justify-between items-center border-l-4 border-l-amber-400 shadow-sm">
-                    <div>
-                        <b class="text-sm uppercase">${p.insumoNom} (x${p.cantidad})</b>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase">${p.usuarioId} • ${p.ubicacion}</p>
-                    </div>
-                    <div class="flex gap-2">
-                        ${canEdit ? `
-                        <button onclick="gestionarPedido('${id}','aprobar','${p.insumoNom}',${p.cantidad})" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-md">Aprobar</button>
-                        <button onclick="gestionarPedido('${id}','rechazar')" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-lg font-bold text-xs">X</button>
-                        ` : '<span class="text-[10px] font-bold text-amber-500 uppercase">En Espera</span>'}
-                    </div>
-                </div>`;
-            }
-
-            // Mis Pedidos (Vista Usuario)
-            if(p.usuarioId === usuarioActual.id && lUser) {
-                let accion = `<span class="badge status-${p.estado}">${p.estado}</span>`;
-                if(p.estado === 'aprobado') {
-                    accion = `
-                    <div class="flex gap-2">
-                        <button onclick="confirmarEntrega('${id}')" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-[10px]">RECIBIDO</button>
-                        <button onclick="abrirIncidencia('${id}')" class="bg-white border border-red-200 text-red-500 px-3 py-1.5 rounded-lg font-bold text-[10px]">REPORTE</button>
+                    <div class="bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm">
+                        <div>
+                            <b class="text-sm uppercase">${p.insumo} (x${p.cantidad})</b>
+                            <p class="text-[10px] text-slate-400 font-bold">${p.usuarioId} | ${p.ubicacion}</p>
+                        </div>
+                        ${acciones}
                     </div>`;
-                }
+            }
+            if (p.usuarioId === usuarioActual.id && lUser) {
                 lUser.innerHTML += `
-                <div class="p-4 bg-white rounded-2xl border shadow-sm flex justify-between items-center">
-                    <div><b class="uppercase text-indigo-900">${p.insumoNom} (x${p.cantidad})</b><p class="text-[10px] text-slate-400 italic">${p.fecha}</p></div>
-                    ${accion}
-                </div>`;
-            }
-        });
-        if(['admin','manager','supervisor'].includes(usuarioActual.rol)) {
-            document.getElementById("metrica-pedidos").innerText = snap.docs.filter(d => d.data().estado === 'pendiente').length;
-        }
-    });
-
-    // 3. CARGAR USUARIOS
-    if(usuarioActual.rol === 'admin') {
-        onSnapshot(collection(db, "usuarios"), snap => {
-            const container = document.getElementById("lista-usuarios-db");
-            if(container) {
-                container.innerHTML = "";
-                snap.forEach(d => {
-                    const u = d.data();
-                    container.innerHTML += `
-                    <div class="bg-white p-4 rounded-2xl border shadow-sm flex justify-between items-center">
-                        <div><b class="text-indigo-600">${d.id}</b><p class="text-[10px] uppercase font-bold text-slate-400">${u.rol}</p></div>
-                        <button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                    <div class="bg-white p-4 rounded-2xl border shadow-sm flex justify-between">
+                        <b class="text-sm uppercase">${p.insumo} (x${p.cantidad})</b>
+                        <span class="badge status-${p.estado}">${p.estado}</span>
                     </div>`;
-                });
             }
         });
-    }
+    });
 }
 
-// --- FUNCIONES DE PEDIDOS ---
-window.ajustarPedido = (ins, delta) => {
-    carritoGlobal[ins] = Math.max(0, (carritoGlobal[ins] || 0) + delta);
-    document.getElementById(`cant-${ins}`).innerText = carritoGlobal[ins];
+// --- FUNCIONES DE ACCIÓN ---
+window.cambiarCant = (id, delta) => {
+    carrito[id] = Math.max(0, (carrito[id] || 0) + delta);
+    document.getElementById(`cant-${id}`).innerText = carrito[id];
 };
 
-window.procesarSolicitudMultiple = async () => {
+window.enviarPedido = async () => {
     const ubi = document.getElementById("sol-ubicacion").value;
-    const items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
-    if(!ubi || items.length === 0) return alert("Falta sede o productos");
+    const items = Object.entries(carrito).filter(([_, c]) => c > 0);
+    if (!ubi || items.length === 0) return alert("Completa los datos");
 
-    for(const [nom, cant] of items) {
+    for (const [insumo, cant] of items) {
         await addDoc(collection(db, "pedidos"), {
-            usuarioId: usuarioActual.id, insumoNom: nom, cantidad: cant,
-            ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now()
+            insumo, cantidad: cant, ubicacion: ubi,
+            usuarioId: usuarioActual.id, estado: "pendiente", fecha: new Date().toLocaleString()
         });
     }
-    alert("Solicitud enviada");
-    carritoGlobal = {};
-    verPagina(usuarioActual.rol === 'user' ? 'notificaciones' : 'solicitudes');
+    alert("Enviado");
+    carrito = {};
+    verPagina(usuarioActual.rol === 'user' ? 'notificaciones' : 'stock');
 };
 
-window.gestionarPedido = async (pid, accion, ins, cant) => {
-    const pRef = doc(db, "pedidos", pid);
-    if(accion === 'aprobar') {
-        const iRef = doc(db, "inventario", ins.toLowerCase());
-        const snap = await getDoc(iRef);
-        if(snap.exists() && snap.data().cantidad >= cant) {
-            await updateDoc(iRef, { cantidad: snap.data().cantidad - cant });
-            await updateDoc(pRef, { estado: "aprobado" });
-        } else alert("Stock insuficiente");
-    } else await updateDoc(pRef, { estado: "rechazado" });
+window.gestionar = async (pid, accion, ins, cant) => {
+    if (accion === 'aprobar') {
+        const ref = doc(db, "inventario", ins.toLowerCase());
+        const s = await getDoc(ref);
+        if (s.exists() && s.data().cantidad >= cant) {
+            await updateDoc(ref, { cantidad: s.data().cantidad - cant });
+            await updateDoc(doc(db, "pedidos", pid), { estado: "aprobado" });
+        } else alert("Sin stock suficiente");
+    } else await updateDoc(doc(db, "pedidos", pid), { estado: "rechazado" });
 };
 
-window.confirmarEntrega = async (pid) => { if(confirm("¿Recibiste el material conforme?")) await updateDoc(doc(db, "pedidos", pid), { estado: "recibido" }); };
+// --- MODALES Y EDICIÓN ---
+window.abrirModalStock = () => document.getElementById("modal-stock").classList.remove("hidden");
+window.cerrarModalStock = () => document.getElementById("modal-stock").classList.add("hidden");
 
-window.abrirIncidencia = (id) => { document.getElementById("incidencia-pid").value = id; document.getElementById("modal-incidencia").classList.remove("hidden"); };
+window.guardarEntradaStock = async () => {
+    const n = document.getElementById("stock-nombre").value.trim().toLowerCase();
+    const c = parseInt(document.getElementById("stock-cantidad").value);
+    if (!n || !c) return;
 
-window.confirmarIncidencia = async (devolver) => {
-    const id = document.getElementById("incidencia-pid").value;
-    const det = document.getElementById("incidencia-detalle").value;
-    const pRef = doc(db, "pedidos", id);
-    const pSnap = await getDoc(pRef);
-    const pData = pSnap.data();
+    const ref = doc(db, "inventario", n);
+    const s = await getDoc(ref);
+    if (s.exists()) await updateDoc(ref, { cantidad: s.data().cantidad + c });
+    else await setDoc(ref, { cantidad: c, precio: 0, stockMin: 0, img: "" });
 
-    if(devolver) {
-        const iRef = doc(db, "inventario", pData.insumoNom.toLowerCase());
-        const iSnap = await getDoc(iRef);
-        await updateDoc(iRef, { cantidad: iSnap.data().cantidad + pData.cantidad });
-        await updateDoc(pRef, { estado: "devuelto", nota: det });
-    } else {
-        await updateDoc(pRef, { estado: "con_incidencia", nota: det });
-    }
-    document.getElementById("modal-incidencia").classList.add("hidden");
+    cerrarModalStock();
 };
 
-// --- OTROS ---
-window.abrirModalInsumo = () => document.getElementById("modal-insumo").classList.remove("hidden");
-window.cerrarModalInsumo = () => document.getElementById("modal-insumo").classList.add("hidden");
-window.eliminarDato = async (col, id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, col, id)); };
+window.abrirEditorInsumo = async (id) => {
+    const s = await getDoc(doc(db, "inventario", id));
+    const p = s.data();
+    document.getElementById("edit-id").value = id;
+    document.getElementById("edit-img").value = p.img || "";
+    document.getElementById("edit-precio").value = p.precio || 0;
+    document.getElementById("edit-min").value = p.stockMin || 0;
+    document.getElementById("modal-editar-insumo").classList.remove("hidden");
+};
+
+window.guardarCambiosInsumo = async () => {
+    const id = document.getElementById("edit-id").value;
+    await updateDoc(doc(db, "inventario", id), {
+        img: document.getElementById("edit-img").value,
+        precio: parseFloat(document.getElementById("edit-precio").value),
+        stockMin: parseInt(document.getElementById("edit-min").value)
+    });
+    document.getElementById("modal-editar-insumo").classList.add("hidden");
+};
 
 function renderChart(lbs, vls) {
-    const ctx = document.getElementById('stockChart');
-    if(!ctx) return;
-    if(stockChart) stockChart.destroy();
+    const ctx = document.getElementById('stockChart').getContext('2d');
+    if (stockChart) stockChart.destroy();
     stockChart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: lbs, datasets: [{ label: 'Unidades en Stock', data: vls, backgroundColor: '#6366f1', borderRadius: 8 }] },
+        data: { labels: lbs, datasets: [{ label: 'Stock Actual', data: vls, backgroundColor: '#6366f1' }] },
         options: { responsive: true, plugins: { legend: { display: false } } }
     });
 }
 
-window.descargarReporte = async () => {
-    const snap = await getDocs(collection(db, "pedidos"));
-    let csv = "Fecha,Insumo,Cantidad,Sede,Usuario,Estado\n";
-    snap.forEach(d => { const p = d.data(); csv += `${p.fecha},${p.insumoNom},${p.cantidad},${p.ubicacion},${p.usuarioId},${p.estado}\n`; });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.setAttribute('hidden', ''); a.setAttribute('href', url); a.setAttribute('download', 'reporte.csv');
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-};
-
+// --- GESTIÓN USUARIOS ---
 window.crearUsuario = async () => {
     const id = document.getElementById("new-user").value.trim().toLowerCase();
-    const p = document.getElementById("new-pass").value.trim();
-    const e = document.getElementById("new-email").value.trim();
-    const r = document.getElementById("new-role").value;
-    if(id && p) { await setDoc(doc(db, "usuarios", id), { pass: p, email: e, rol: r }); alert("Usuario Creado"); }
+    const pass = document.getElementById("new-pass").value;
+    const email = document.getElementById("new-email").value;
+    const rol = document.getElementById("new-role").value;
+    if (id && pass) await setDoc(doc(db, "usuarios", id), { pass, email, rol });
 };
+
+onSnapshot(collection(db, "usuarios"), snap => {
+    const l = document.getElementById("lista-usuarios-db");
+    if(!l) return;
+    l.innerHTML = "";
+    snap.forEach(d => {
+        l.innerHTML += `<div class="bg-white p-3 rounded-xl border flex justify-between items-center shadow-sm">
+            <span><b>${d.id}</b> (${d.data().rol})</span>
+            <button onclick="eliminar('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button>
+        </div>`;
+    });
+});
+
+window.eliminar = async (c, id) => { if(confirm("¿Eliminar?")) await deleteDoc(doc(db, c, id)); };
