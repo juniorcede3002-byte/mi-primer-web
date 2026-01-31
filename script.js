@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// --- CONFIGURACIÓN (¡COLOCA TUS LLAVES AQUÍ!) ---
+// --- CONFIGURACIÓN (TUS LLAVES) ---
 const firebaseConfig = {
     apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8",
     authDomain: "mi-web-db.firebaseapp.com",
@@ -10,13 +10,13 @@ const firebaseConfig = {
 };
 
 // CLOUDINARY CONFIG
-const CLOUD_NAME = 'df79cjklp'; // <-- PON TU CLOUD NAME AQUÍ
-const UPLOAD_PRESET = 'insumos'; // <-- PON TU UPLOAD PRESET AQUÍ
+const CLOUD_NAME = 'df79cjklp'; 
+const UPLOAD_PRESET = 'insumos'; 
 
 // EMAILJS CONFIG
-const EMAIL_SERVICE_ID = 'service_a7yozqh'; // <-- TU EMAILJS SERVICE ID
-const EMAIL_TEMPLATE_ALERT = 'template_dmqfty5'; // <-- ID DEL TEMPLATE DE ALERTA DE STOCK
-const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; // <-- TU PUBLIC KEY
+const EMAIL_SERVICE_ID = 'service_a7yozqh'; 
+const EMAIL_TEMPLATE_ALERT = 'template_dmqfty5'; 
+const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -58,7 +58,8 @@ function setupCloudinary() {
             preview.classList.remove('hidden');
         }
     });
-    document.getElementById("upload_widget").addEventListener("click", () => cloudinaryWidget.open(), false);
+    const btnUpload = document.getElementById("upload_widget");
+    if(btnUpload) btnUpload.addEventListener("click", () => cloudinaryWidget.open(), false);
 }
 
 
@@ -112,9 +113,28 @@ window.toggleMenu = (force) => {
 
 function configurarMenu() {
     const rol = usuarioActual.rol, menu = document.getElementById("menu-dinamico");
-    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Historial',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Pedidos',i:'shipping-fast'} };
+    const i = { 
+        st:{id:'stats',n:'Dashboard',i:'chart-pie'}, 
+        sk:{id:'stock',n:'Stock',i:'boxes'}, 
+        pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, 
+        pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, 
+        hs:{id:'historial',n:'Historial',i:'history'}, 
+        us:{id:'usuarios',n:'Accesos',i:'users-cog'}, 
+        // IMPORTANTE: Este es el tab de recibir
+        mp:{id:'notificaciones',n:'Mis Pedidos / Recibir',i:'shipping-fast'} 
+    };
+    
     let r = [];
-    if(rol==='admin') r=[i.st,i.sk,i.pd,i.pe,i.hs,i.us]; else if(rol==='manager'||rol==='supervisor') r=[i.st,i.sk,i.pd,i.pe,i.hs]; else r=[i.sk,i.pd,i.mp];
+    
+    // AQUÍ ESTÁ EL AJUSTE: Se agregó 'i.mp' a TODOS los roles para que todos puedan recibir sus pedidos
+    if(rol==='admin') {
+        r=[i.st,i.sk,i.pd,i.pe,i.hs,i.us,i.mp]; 
+    } else if(rol==='manager'||rol==='supervisor') {
+        r=[i.st,i.sk,i.pd,i.pe,i.hs,i.mp]; 
+    } else {
+        r=[i.sk,i.pd,i.mp];
+    }
+    
     menu.innerHTML = r.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
 }
 
@@ -128,7 +148,8 @@ window.ajustarCantidad = (ins, d) => {
 window.procesarSolicitudMultiple = async () => {
     const ubi = document.getElementById("sol-ubicacion").value, items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
     if(!ubi || items.length === 0) return alert("Seleccione sede y productos.");
-    const red = (usuarioActual.rol === 'user') ? 'notificaciones' : 'solicitudes';
+    // Redirigimos siempre a Mis Pedidos para que vean lo que acaban de pedir
+    const red = 'notificaciones'; 
     await Promise.all(items.map(([ins, cant]) => addDoc(collection(db, "pedidos"), { usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now() })));
     alert("✅ Pedido enviado."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina(red);
 };
@@ -184,7 +205,7 @@ window.confirmarIncidencia = async (dev) => {
     document.getElementById('modal-incidencia').classList.add('hidden'); alert("Reporte registrado.");
 };
 
-// --- GESTIÓN DE INVENTARIO (NUEVO: EDICIÓN COMPLETA) ---
+// --- GESTIÓN DE INVENTARIO ---
 window.agregarProductoRápido = async () => {
     const n = document.getElementById("nombre-prod").value.trim().toUpperCase();
     const c = parseInt(document.getElementById("cantidad-prod").value);
@@ -228,7 +249,7 @@ window.cerrarModalDetalles = () => {
 };
 window.eliminarDato = async (c, i) => { if(confirm("¿Eliminar permanentemente?")) await deleteDoc(doc(db, c, i)); };
 
-// --- GESTIÓN DE USUARIOS (NUEVO: EDICIÓN) ---
+// --- GESTIÓN DE USUARIOS (EDICIÓN) ---
 window.guardarUsuario = async () => {
     const editId = document.getElementById("edit-mode-id").value;
     const idInput = document.getElementById("new-user");
@@ -241,21 +262,24 @@ window.guardarUsuario = async () => {
     // Si estamos editando y cambiaron el ID, advertir
     if(editId && editId !== id) return alert("No puedes cambiar el ID de un usuario existente. Crea uno nuevo y borra el anterior.");
     
-    await setDoc(doc(db, "usuarios", id), { pass, rol }, { merge: true }); // Merge para actualizar si existe
+    await setDoc(doc(db, "usuarios", id), { pass, rol }, { merge: true }); 
     
     alert(editId ? "Usuario actualizado." : "Usuario creado.");
-    cancelarEdicionUsuario(); // Limpiar formulario
+    cancelarEdicionUsuario(); 
 };
 
 window.prepararEdicionUsuario = (id, pass, rol) => {
     document.getElementById("edit-mode-id").value = id;
     document.getElementById("new-user").value = id;
-    document.getElementById("new-user").disabled = true; // Bloquear ID al editar
+    document.getElementById("new-user").disabled = true; 
     document.getElementById("new-pass").value = pass;
     document.getElementById("new-role").value = rol;
-    document.getElementById("titulo-form-usuario").innerHTML = `<i class="fas fa-user-edit"></i> Editando a: <span class="text-indigo-600">${id}</span>`;
-    document.getElementById("btn-guardar-usuario").innerText = "Actualizar Usuario";
-    document.getElementById("cancel-edit-msg").classList.remove("hidden");
+    const title = document.getElementById("titulo-form-usuario");
+    if(title) title.innerHTML = `<i class="fas fa-user-edit"></i> Editando a: <span class="text-indigo-600">${id}</span>`;
+    const btn = document.getElementById("btn-guardar-usuario");
+    if(btn) btn.innerText = "Actualizar Usuario";
+    const msg = document.getElementById("cancel-edit-msg");
+    if(msg) msg.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -265,9 +289,12 @@ window.cancelarEdicionUsuario = () => {
     document.getElementById("new-user").disabled = false;
     document.getElementById("new-pass").value = "";
     document.getElementById("new-role").value = "user";
-    document.getElementById("titulo-form-usuario").innerHTML = `<i class="fas fa-user-plus"></i> Crear Nuevo Acceso`;
-    document.getElementById("btn-guardar-usuario").innerText = "Guardar";
-    document.getElementById("cancel-edit-msg").classList.add("hidden");
+    const title = document.getElementById("titulo-form-usuario");
+    if(title) title.innerHTML = `<i class="fas fa-user-plus"></i> Crear Nuevo Acceso`;
+    const btn = document.getElementById("btn-guardar-usuario");
+    if(btn) btn.innerText = "Guardar";
+    const msg = document.getElementById("cancel-edit-msg");
+    if(msg) msg.classList.add("hidden");
 };
 
 
@@ -283,7 +310,6 @@ function activarSincronizacion() {
             const p=ds.data(), n=ds.id.toUpperCase(); totR++; totS+=p.cantidad; lbls.push(n.slice(0,10)); dta.push(p.cantidad);
             if(dl) dl.innerHTML+=`<option value="${n}">`;
 
-            // Botones de acción (Editar / Borrar)
             const canManage = ['admin','manager'].includes(usuarioActual.rol);
             const actions = canManage ? `
                 <div class="flex gap-2">
@@ -291,11 +317,8 @@ function activarSincronizacion() {
                     <button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400 transition"><i class="fas fa-trash"></i></button>
                 </div>` : '';
             
-            // Imagen del producto
             const imgHtml = p.imagen ? `<img src="${p.imagen}" class="w-12 h-12 object-cover rounded-lg border border-slate-100 mb-2">` : `<div class="w-12 h-12 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-center text-slate-300 mb-2"><i class="fas fa-image"></i></div>`;
-            // Precio
             const precioHtml = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
-            // Alerta Stock Mínimo
             const alertaMin = (p.stockMinimo && p.cantidad <= p.stockMinimo) ? `<i class="fas fa-exclamation-circle text-red-500 ml-2 animate-pulse" title="Stock Bajo (Mín: ${p.stockMinimo})"></i>` : '';
 
             grid.innerHTML += `
@@ -335,13 +358,56 @@ function activarSincronizacion() {
         }
     });
 
-    // 2. PEDIDOS (Lógica igual a v3.5)
-    onSnapshot(collection(db,"pedidos"), s=>{ const la=document.getElementById("lista-pendientes-admin"), lu=document.getElementById("lista-notificaciones"), th=document.getElementById("tabla-historial-body"); if(la)la.innerHTML=""; if(lu)lu.innerHTML=""; if(th)th.innerHTML=""; let pc=0, ls={}, us={}; s.forEach(ds=>{ const p=ds.data(), id=ds.id; if(p.estado==='aprobado'||p.estado==='recibido'){ls[p.ubicacion]=(ls[p.ubicacion]||0)+1;us[p.usuarioId]=(us[p.usuarioId]||0)+1;} const isStaff=['admin','manager','supervisor'].includes(usuarioActual.rol); if(isStaff&&p.estado==='pendiente'){ pc++; let cts=`<span class="badge bg-slate-100 text-slate-500">Solo Lectura</span>`; if(usuarioActual.rol!=='supervisor'){cts=`<div class="flex items-center gap-2 mt-3 pt-3 border-t border-amber-100"><div class="flex flex-col"><span class="text-[8px] uppercase font-bold text-amber-700">Aprobar:</span><input type="number" id="qty-${id}" value="${p.cantidad}" class="w-16 p-1.5 text-center text-sm font-bold bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></div><div class="flex gap-2 ml-auto"><button onclick="gestionarPedido('${id}','aprobar','${p.insumoNom}')" class="w-9 h-9 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 flex items-center justify-center transition"><i class="fas fa-check"></i></button><button onclick="gestionarPedido('${id}','rechazar')" class="w-9 h-9 rounded-lg bg-white border border-red-100 text-red-500 hover:bg-red-50 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div></div>`;} la.innerHTML+=`<div class="bg-white p-4 rounded-2xl border-l-4 border-l-amber-400 shadow-sm"><div class="flex justify-between items-start"><div><h4 class="font-black text-slate-700 uppercase text-sm">${p.insumoNom}</h4><div class="flex flex-wrap gap-2 mt-2"><span class="px-2 py-1 rounded-md bg-slate-50 text-slate-500 text-[10px] font-bold"><i class="fas fa-user"></i> ${p.usuarioId}</span><span class="px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-bold"><i class="fas fa-map-marker-alt"></i> ${p.ubicacion}</span></div></div><span class="text-xl font-black text-amber-500">x${p.cantidad}</span></div>${cts}</div>`; } if(p.estado!=='pendiente'&&th){ const nt=p.detalleIncidencia?`<br><span class="text-[9px] text-red-400 italic">"${p.detalleIncidencia}"</span>`:''; th.innerHTML+=`<tr class="hover:bg-slate-50 transition"><td class="p-4 text-slate-400 font-mono">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase text-slate-700">${p.insumoNom}</td><td class="p-4 text-slate-600">x${p.cantidad}</td><td class="p-4"><span class="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px]">${p.ubicacion}</span></td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span>${nt}</td></tr>`; } if(p.usuarioId===usuarioActual.id&&lu){ let acts=""; if(p.estado==='aprobado'){acts=`<div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-50"><button onclick="confirmarRecibido('${id}')" class="py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold shadow hover:bg-emerald-600">Confirmar Recibido</button><button onclick="abrirIncidencia('${id}')" class="py-2 bg-white border border-slate-200 text-slate-500 rounded-lg text-xs font-bold hover:bg-slate-50 hover:text-red-500">Reportar</button></div>`;} lu.innerHTML+=`<div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden"><div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-slate-300 pointer-events-none"><i class="fas fa-box-open"></i></div><div class="relative z-10"><div class="flex justify-between items-start mb-2"><span class="px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider">${p.ubicacion}</span><span class="badge status-${p.estado}">${p.estado}</span></div><h3 class="text-lg font-black text-slate-800 uppercase">${p.insumoNom}</h3><p class="text-sm font-bold text-slate-400 mb-1">Cantidad: <span class="text-slate-600">${p.cantidad}</span></p><p class="text-[10px] text-slate-300 font-mono">${p.fecha}</p>${acts}</div></div>`; } }); if(document.getElementById("metrica-pedidos")){ document.getElementById("metrica-pedidos").innerText=pc; renderChart('userChart',Object.keys(us),Object.values(us),'Pedidos','#818cf8',userChart,c=>userChart=c); renderChart('locationChart',Object.keys(ls),Object.values(ls),'Pedidos','#fbbf24',locationChart,c=>locationChart=c); } });
+    // 2. PEDIDOS
+    onSnapshot(collection(db,"pedidos"), s=>{ 
+        const la=document.getElementById("lista-pendientes-admin"), lu=document.getElementById("lista-notificaciones"), th=document.getElementById("tabla-historial-body"); 
+        if(la)la.innerHTML=""; if(lu)lu.innerHTML=""; if(th)th.innerHTML=""; 
+        let pc=0, ls={}, us={}; 
+        
+        s.forEach(ds=>{ 
+            const p=ds.data(), id=ds.id; 
+            if(p.estado==='aprobado'||p.estado==='recibido'){ls[p.ubicacion]=(ls[p.ubicacion]||0)+1;us[p.usuarioId]=(us[p.usuarioId]||0)+1;} 
+            
+            const isStaff=['admin','manager','supervisor'].includes(usuarioActual.rol); 
+            
+            // ADMIN / STAFF VIEW
+            if(isStaff && p.estado==='pendiente'){ 
+                pc++; 
+                let cts=`<span class="badge bg-slate-100 text-slate-500">Solo Lectura</span>`; 
+                if(usuarioActual.rol!=='supervisor'){
+                    cts=`<div class="flex items-center gap-2 mt-3 pt-3 border-t border-amber-100"><div class="flex flex-col"><span class="text-[8px] uppercase font-bold text-amber-700">Aprobar:</span><input type="number" id="qty-${id}" value="${p.cantidad}" class="w-16 p-1.5 text-center text-sm font-bold bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></div><div class="flex gap-2 ml-auto"><button onclick="gestionarPedido('${id}','aprobar','${p.insumoNom}')" class="w-9 h-9 rounded-lg bg-indigo-600 text-white shadow-md hover:bg-indigo-700 flex items-center justify-center transition"><i class="fas fa-check"></i></button><button onclick="gestionarPedido('${id}','rechazar')" class="w-9 h-9 rounded-lg bg-white border border-red-100 text-red-500 hover:bg-red-50 flex items-center justify-center transition"><i class="fas fa-times"></i></button></div></div>`;
+                } 
+                la.innerHTML+=`<div class="bg-white p-4 rounded-2xl border-l-4 border-l-amber-400 shadow-sm"><div class="flex justify-between items-start"><div><h4 class="font-black text-slate-700 uppercase text-sm">${p.insumoNom}</h4><div class="flex flex-wrap gap-2 mt-2"><span class="px-2 py-1 rounded-md bg-slate-50 text-slate-500 text-[10px] font-bold"><i class="fas fa-user"></i> ${p.usuarioId}</span><span class="px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-bold"><i class="fas fa-map-marker-alt"></i> ${p.ubicacion}</span></div></div><span class="text-xl font-black text-amber-500">x${p.cantidad}</span></div>${cts}</div>`; 
+            } 
+            
+            // HISTORY VIEW
+            if(p.estado!=='pendiente'&&th){ 
+                const nt=p.detalleIncidencia?`<br><span class="text-[9px] text-red-400 italic">"${p.detalleIncidencia}"</span>`:''; 
+                th.innerHTML+=`<tr class="hover:bg-slate-50 transition"><td class="p-4 text-slate-400 font-mono">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase text-slate-700">${p.insumoNom}</td><td class="p-4 text-slate-600">x${p.cantidad}</td><td class="p-4"><span class="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold text-[10px]">${p.ubicacion}</span></td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span>${nt}</td></tr>`; 
+            } 
+            
+            // USER & RECEIVE VIEW (Mis Pedidos)
+            // IMPORTANTE: Ahora se muestra también si el usuario es el que lo pidió, independiente del rol
+            if(p.usuarioId===usuarioActual.id && lu){ 
+                let acts=""; 
+                if(p.estado==='aprobado'){
+                    acts=`<div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-50"><button onclick="confirmarRecibido('${id}')" class="py-2 bg-emerald-500 text-white rounded-lg text-xs font-bold shadow hover:bg-emerald-600">Confirmar Recibido</button><button onclick="abrirIncidencia('${id}')" class="py-2 bg-white border border-slate-200 text-slate-500 rounded-lg text-xs font-bold hover:bg-slate-50 hover:text-red-500">Reportar</button></div>`;
+                } 
+                lu.innerHTML+=`<div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden"><div class="absolute top-0 right-0 p-4 opacity-10 text-6xl text-slate-300 pointer-events-none"><i class="fas fa-box-open"></i></div><div class="relative z-10"><div class="flex justify-between items-start mb-2"><span class="px-2 py-1 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider">${p.ubicacion}</span><span class="badge status-${p.estado}">${p.estado}</span></div><h3 class="text-lg font-black text-slate-800 uppercase">${p.insumoNom}</h3><p class="text-sm font-bold text-slate-400 mb-1">Cantidad: <span class="text-slate-600">${p.cantidad}</span></p><p class="text-[10px] text-slate-300 font-mono">${p.fecha}</p>${acts}</div></div>`; 
+            } 
+        }); 
+        
+        if(document.getElementById("metrica-pedidos")){ 
+            document.getElementById("metrica-pedidos").innerText=pc; 
+            renderChart('userChart',Object.keys(us),Object.values(us),'Pedidos','#818cf8',userChart,c=>userChart=c); 
+            renderChart('locationChart',Object.keys(ls),Object.values(ls),'Pedidos','#fbbf24',locationChart,c=>locationChart=c); 
+        } 
+    });
 
-    // 3. ENTRADAS (Igual que v3.5)
+    // 3. ENTRADAS
     onSnapshot(collection(db,"entradas_stock"), s=>{ const t=document.getElementById("tabla-entradas-body"); if(t){t.innerHTML=""; let d=[]; s.forEach(x=>d.push(x.data())); d.sort((a,b)=>b.timestamp-a.timestamp); d.forEach(e=>{t.innerHTML+=`<tr class="hover:bg-emerald-50/30 transition"><td class="p-4 text-emerald-800/60 font-mono">${e.fecha}</td><td class="p-4 font-bold uppercase text-emerald-900">${e.insumo}</td><td class="p-4 font-black text-emerald-600">+${e.cantidad}</td><td class="p-4 text-emerald-800/80 text-[10px] font-bold uppercase">${e.usuario}</td></tr>`;});}});
 
-    // 4. USUARIOS (NUEVO: BOTÓN EDITAR)
+    // 4. USUARIOS
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "usuarios"), snap => {
             const l = document.getElementById("lista-usuarios-db");
@@ -369,6 +435,6 @@ function activarSincronizacion() {
     }
 }
 
-// --- REPORTES Y GRÁFICAS (Igual que v3.5) ---
+// --- REPORTES Y GRÁFICAS ---
 window.descargarReporte=async()=>{ if(!confirm("¿Generar CSV Completo?"))return; const [st,en,pe]=await Promise.all([getDocs(collection(db,"inventario")),getDocs(collection(db,"entradas_stock")),getDocs(collection(db,"pedidos"))]); let c="data:text/csv;charset=utf-8,--- STOCK ACTUAL ---\r\nINSUMO,CANTIDAD,PRECIO,STOCK_MIN\r\n"; st.forEach(d=>{const p=d.data(); c+=`${d.id.toUpperCase()},${p.cantidad},${p.precio||0},${p.stockMinimo||0}\r\n`;}); c+="\r\n--- ENTRADAS ---\r\nFECHA,INSUMO,CANTIDAD,USUARIO\r\n"; en.forEach(d=>{const x=d.data();c+=`${x.fecha.replace(/,/g,' ')},${x.insumo},${x.cantidad},${x.usuario}\r\n`;}); c+="\r\n--- PEDIDOS ---\r\nFECHA,INSUMO,CANTIDAD,SEDE,USUARIO,ESTADO,NOTA\r\n"; pe.forEach(d=>{const x=d.data();if(x.estado!=='pendiente')c+=`${x.fecha.replace(/,/g,' ')},${x.insumoNom},${x.cantidad},${x.ubicacion},${x.usuarioId},${x.estado},${x.detalleIncidencia||''}\r\n`;}); const l=document.createElement("a");l.href=encodeURI(c);l.download=`FCI_Reporte_${new Date().toISOString().slice(0,10)}.csv`;document.body.appendChild(l);l.click();document.body.removeChild(l);};
 function renderChart(id,l,d,t,c,i,s){const x=document.getElementById(id);if(!x)return;if(i)i.destroy();s(new Chart(x,{type:'bar',data:{labels:l,datasets:[{label:t,data:d,backgroundColor:c,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}}}}));}
