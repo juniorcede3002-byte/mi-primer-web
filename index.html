@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FCILog Pro - V7 Master</title>
+    <title>FCILog - InsuManager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -13,7 +13,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-700">
 
-    <div id="pantalla-login" class="fixed inset-0 z-[200] bg-white flex items-center justify-center p-6">
+    <div id="pantalla-login" class="fixed inset-0 z-[999] bg-white flex items-center justify-center p-6">
         <div class="w-full max-w-sm text-center">
             <div class="inline-block p-5 bg-indigo-50 rounded-[2rem] mb-6 shadow-sm">
                 <i class="fas fa-cubes text-6xl text-indigo-600"></i>
@@ -21,24 +21,27 @@
             <h1 class="text-3xl font-black mb-2 text-indigo-900 tracking-tight">FCILog System</h1>
             <p class="text-slate-400 text-sm mb-8 font-medium">Gestión Integral de Insumos</p>
             <div class="space-y-4">
-                <input id="login-user" type="text" placeholder="Usuario" class="input-light text-center">
+                <input id="login-user" type="text" placeholder="Usuario" class="input-light text-center uppercase">
                 <input id="login-pass" type="password" placeholder="Contraseña" class="input-light text-center">
                 <button onclick="iniciarSesion()" class="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:bg-indigo-700 transition-all duration-200">Iniciar Sesión</button>
             </div>
-            <p class="text-[10px] text-slate-300 mt-8 font-mono">v7.0 Fixed Menu</p>
+            <p class="text-[10px] text-slate-300 mt-8 font-mono">System v8.0</p>
         </div>
     </div>
 
-    <div id="interfaz-app" class="hidden min-h-screen flex flex-col">
-        <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-100 p-4 flex justify-between items-center sticky top-0 z-[500]">
-            <span class="font-black text-indigo-600 text-xl tracking-tight"><i class="fas fa-cubes"></i> FCILog</span>
-            <button onclick="toggleMenu()" class="text-2xl text-slate-700 p-2 active:bg-slate-100 rounded-lg transition"><i class="fas fa-bars"></i></button>
+    <div id="interfaz-app" class="hidden min-h-screen flex flex-col relative">
+        
+        <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-100 p-4 flex justify-between items-center sticky top-0 z-40">
+            <span class="font-black text-indigo-600 text-xl tracking-tight"><i class="fas fa-cubes"></i> InsuManager</span>
+            <button onclick="toggleMenu()" class="text-2xl text-slate-700 p-2 rounded-lg hover:bg-slate-100 active:scale-95 transition cursor-pointer z-50">
+                <i class="fas fa-bars"></i>
+            </button>
         </header>
 
-        <div class="flex flex-1 relative">
-            <aside id="sidebar" class="fixed inset-y-0 left-0 z-[600] w-72 bg-white border-r border-slate-100 p-6 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none h-full">
+        <div class="flex flex-1">
+            <aside id="sidebar" class="fixed inset-y-0 left-0 z-[100] w-72 bg-white border-r border-slate-100 p-6 flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none h-full">
                 <div class="flex justify-between items-center mb-10 pl-2">
-                    <h1 class="text-xl font-black italic text-indigo-600 tracking-tighter">📦 InsuManager</h1>
+                    <h1 class="text-xl font-black italic text-indigo-600 tracking-tighter">📦 FCILog</h1>
                     <button onclick="toggleMenu()" class="md:hidden text-slate-400 hover:text-red-500 transition p-2"><i class="fas fa-times text-xl"></i></button>
                 </div>
                 <nav id="menu-dinamico" class="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2"></nav>
@@ -48,48 +51,21 @@
                 </div>
             </aside>
             
-            <div id="sidebar-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-slate-900/50 z-[550] hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+            <div id="sidebar-overlay" onclick="toggleMenu()" class="fixed inset-0 bg-slate-900/50 z-[90] hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
             <main class="flex-1 p-4 md:p-8 md:ml-72 w-full overflow-x-hidden bg-slate-50/50 min-h-screen">
                 
                 <section id="pag-stats" class="view hidden space-y-6 animate-fade-in">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-                        <div>
-                            <h2 class="text-2xl font-black text-slate-800">Dashboard</h2>
-                            <p class="text-slate-400 text-xs">Análisis de consumo y métricas</p>
-                        </div>
-                        
-                        <div class="flex flex-wrap gap-2 w-full md:w-auto">
-                            <select id="dash-filtro-fecha" onchange="renderDashboard()" class="input-filter">
-                                <option value="todos">📅 Todo el Historial</option>
-                                <option value="mes_actual">📅 Este Mes</option>
-                                <option value="mes_anterior">📅 Mes Pasado</option>
-                            </select>
-                            <select id="dash-filtro-sede" onchange="renderDashboard()" class="input-filter">
-                                <option value="todas">🏢 Todas las Sedes</option>
-                                </select>
-                            <select id="dash-filtro-user" onchange="renderDashboard()" class="input-filter">
-                                <option value="todos">👤 Todos los Usuarios</option>
-                                </select>
-                        </div>
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-black text-slate-800">Dashboard</h2>
+                        <button onclick="activarSincronizacion()" class="p-2 text-slate-400 hover:text-indigo-600 bg-white rounded-lg border border-slate-100"><i class="fas fa-sync-alt"></i></button>
                     </div>
-
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div class="card-metrica border-b-4 border-indigo-500"><div class="icon-box text-indigo-600 bg-indigo-50"><i class="fas fa-boxes"></i></div><span>Referencias</span><h2 id="metrica-ref">0</h2></div>
-                        <div class="card-metrica border-b-4 border-emerald-500"><div class="icon-box text-emerald-600 bg-emerald-50"><i class="fas fa-check-circle"></i></div><span>Entregados (Filtrado)</span><h2 id="metrica-entregados">0</h2></div>
-                        <div class="card-metrica border-b-4 border-amber-500"><div class="icon-box text-amber-600 bg-amber-50"><i class="fas fa-clock"></i></div><span>Pendientes Global</span><h2 id="metrica-pendientes">0</h2></div>
+                        <div class="card-metrica border-b-4 border-indigo-500"><div class="icon-box text-indigo-600 bg-indigo-50"><i class="fas fa-boxes"></i></div><span>Referencias</span><h2 id="metrica-total">0</h2></div>
+                        <div class="card-metrica border-b-4 border-emerald-500"><div class="icon-box text-emerald-600 bg-emerald-50"><i class="fas fa-layer-group"></i></div><span>Stock Total</span><h2 id="metrica-stock">0</h2></div>
+                        <div class="card-metrica border-b-4 border-amber-500"><div class="icon-box text-amber-600 bg-amber-50"><i class="fas fa-shopping-cart"></i></div><span>Pendientes</span><h2 id="metrica-pedidos">0</h2></div>
                     </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                            <h3 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Consumo por Insumo (Top 10)</h3>
-                            <div class="h-64"><canvas id="chart-insumos"></canvas></div>
-                        </div>
-                        <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                            <h3 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest">Distribución por Sede</h3>
-                            <div class="h-64"><canvas id="chart-sedes"></canvas></div>
-                        </div>
-                    </div>
+                    <div class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm h-64"><canvas id="stockChart"></canvas></div>
                 </section>
 
                 <section id="pag-stock" class="view hidden space-y-6 animate-fade-in">
@@ -109,7 +85,7 @@
                     <h2 class="text-2xl font-black text-slate-800">Centro de Aprobaciones</h2>
                     <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-start gap-3 text-indigo-800 text-sm">
                         <i class="fas fa-info-circle mt-1"></i>
-                        <p>Solicitudes agrupadas. Haz clic en una tarjeta para aprobar los items individualmente.</p>
+                        <p>Solicitudes agrupadas. Haz clic en "Ver Detalles" para gestionar.</p>
                     </div>
                     <div id="lista-pendientes-admin" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
                 </section>
@@ -117,7 +93,7 @@
                 <section id="pag-historial" class="view hidden space-y-8 animate-fade-in">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h2 class="text-2xl font-black text-slate-800">Bitácora</h2>
-                        <button onclick="descargarReporte()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2 text-sm"><i class="fas fa-file-excel"></i> Descargar Excel (.XLS)</button>
+                        <button onclick="descargarReporte()" class="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition flex items-center gap-2 text-sm"><i class="fas fa-file-excel"></i> Descargar Excel</button>
                     </div>
                     <div class="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm overflow-hidden">
                         <div class="overflow-x-auto max-h-[400px] custom-scroll">
@@ -133,7 +109,7 @@
                     <div class="bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                         <h3 id="titulo-form-usuario" class="font-black text-lg mb-6 flex items-center gap-2 text-indigo-900"><i class="fas fa-user-plus"></i> Gestión de Accesos</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <input id="new-user" placeholder="ID Usuario" class="input-light">
+                            <input id="new-user" placeholder="ID Usuario" class="input-light uppercase">
                             <input id="new-pass" type="text" placeholder="Contraseña" class="input-light">
                             <input id="new-email" type="email" placeholder="Correo" class="input-light">
                             <input type="hidden" id="edit-mode-id">
@@ -159,7 +135,7 @@
                 </section>
 
                 <section id="pag-notificaciones" class="view hidden space-y-6 animate-fade-in">
-                    <div class="flex justify-between items-center mb-2"><h2 class="text-2xl font-black text-slate-800">Mis Solicitudes</h2></div>
+                    <h2 class="text-2xl font-black text-slate-800 mb-4">Mis Solicitudes</h2>
                     <div class="flex bg-slate-200 p-1 rounded-2xl w-full max-w-md mx-auto mb-6">
                         <button onclick="switchTab('activos')" id="tab-btn-activos" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm">En Curso</button>
                         <button onclick="switchTab('historial')" id="tab-btn-historial" class="flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all">Historial Recibido</button>
@@ -172,9 +148,30 @@
         </div>
     </div>
 
-    <div id="modal-grupo-admin" class="fixed inset-0 bg-slate-900/60 hidden z-[300] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white p-6 rounded-[2rem] w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]"><div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-4"><div><h3 class="text-xl font-black text-slate-800">Detalle de Solicitud</h3><p id="modal-grupo-titulo" class="text-xs text-slate-500 font-medium"></p></div><button onclick="document.getElementById('modal-grupo-admin').classList.add('hidden')" class="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100"><i class="fas fa-times"></i></button></div><div id="modal-grupo-contenido" class="flex-1 overflow-y-auto custom-scroll space-y-2 p-2"></div></div></div>
+    <div id="modal-grupo-admin" class="fixed inset-0 bg-slate-900/60 hidden z-[200] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white p-6 rounded-[2rem] w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]"><div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-4"><div><h3 class="text-xl font-black text-slate-800">Detalle de Solicitud</h3><p id="modal-grupo-titulo" class="text-xs text-slate-500 font-medium"></p></div><button onclick="document.getElementById('modal-grupo-admin').classList.add('hidden')" class="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100"><i class="fas fa-times"></i></button></div><div id="modal-grupo-contenido" class="flex-1 overflow-y-auto custom-scroll space-y-2 p-2"></div></div></div>
     
-    <div id="modal-insumo" class="fixed inset-0 bg-slate-900/60 hidden z-[250] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl"><h3 class="text-xl font-black mb-6 text-center text-indigo-900">Entrada Rápida</h3><div class="space-y-4"><div><label class="label-form">Buscar / Crear Producto</label><input id="nombre-prod" list="lista-sugerencias" placeholder="Escribe para buscar..." class="input-light uppercase font-bold text-slate-700"><datalist id="lista-sugerencias"></datalist></div><div><label class="label-form">Cantidad</label><input id="cantidad-prod" type="number" placeholder="0" class="input-light font-bold text-lg text-emerald-600"></div><div class="grid grid-cols-2 gap-3"><button onclick="cerrarModalInsumo()" class="py-3 bg-slate-100 rounded-xl font-bold">Cancelar</button><button onclick="agregarProductoRápido()" class="py-3 bg-indigo-600 text-white rounded-xl font-bold">Guardar</button></div></div></div></div>
+    <div id="modal-insumo" class="fixed inset-0 bg-slate-900/60 hidden z-[250] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl scale-100 transition-transform">
+            <h3 class="text-xl font-black mb-6 text-center text-indigo-900">Entrada Rápida</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="label-form">Buscar o Crear Producto</label>
+                    <input id="nombre-prod" list="lista-sugerencias" type="text" placeholder="Escribe para buscar..." class="input-light uppercase font-bold text-slate-700 border-2 focus:border-indigo-500">
+                    <datalist id="lista-sugerencias">
+                        </datalist>
+                    <p class="text-[10px] text-slate-400 mt-1 ml-1">*Selecciona de la lista para sumar al stock existente.</p>
+                </div>
+                <div>
+                    <label class="label-form">Cantidad a Sumar</label>
+                    <input id="cantidad-prod" type="number" placeholder="0" class="input-light font-bold text-lg text-emerald-600 text-center">
+                </div>
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button onclick="cerrarModalInsumo()" class="py-3 bg-slate-100 text-slate-500 rounded-xl font-bold hover:bg-slate-200 transition">Cancelar</button>
+                    <button onclick="agregarProductoRápido()" class="py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div id="modal-detalles" class="fixed inset-0 bg-slate-900/60 hidden z-[250] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl"><h3 class="text-xl font-black mb-6 text-center text-slate-800">Editar Producto</h3><input type="hidden" id="edit-prod-id"><div class="space-y-4"><div class="flex flex-col items-center p-4 border-2 border-dashed rounded-xl"><img id="preview-img" class="h-32 w-32 object-contain rounded-lg mb-3 hidden"><button id="upload_widget" class="bg-indigo-100 text-indigo-600 px-4 py-2 rounded-lg font-bold text-xs"><i class="fas fa-camera"></i> Subir Foto</button><input type="hidden" id="edit-prod-img"></div><div class="grid grid-cols-2 gap-4"><input id="edit-prod-precio" type="number" step="0.01" class="input-light font-bold" placeholder="Precio ($)"><input id="edit-prod-min" type="number" class="input-light font-bold text-red-500" placeholder="Stock Mínimo"></div><div class="grid grid-cols-2 gap-3"><button onclick="cerrarModalDetalles()" class="py-3 bg-slate-100 rounded-xl font-bold">Cancelar</button><button onclick="guardarDetallesProducto()" class="py-3 bg-slate-800 text-white rounded-xl font-bold">Guardar</button></div></div></div></div>
     
