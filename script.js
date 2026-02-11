@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+// CONFIGURACIÓN (TUS LLAVES)
 const firebaseConfig = { apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8", authDomain: "mi-web-db.firebaseapp.com", projectId: "mi-web-db", storageBucket: "mi-web-db.appspot.com" };
 const CLOUD_NAME = 'df79cjklp'; const UPLOAD_PRESET = 'insumos'; 
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; const EMAIL_TEMPLATE_ID = 'template_mlcofoo'; const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
@@ -10,7 +11,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let usuarioActual = null, stockChart=null, userChart=null, locationChart=null, carritoGlobal={}, cloudinaryWidget=null;
-let allPedidos = []; // Cache para filtrar
+let pedidosRaw = []; // Para agrupar
 
 emailjs.init(EMAIL_PUBLIC_KEY);
 
@@ -41,7 +42,7 @@ function cargarSesion(d) {
     document.getElementById("pantalla-login").classList.add("hidden");
     document.getElementById("interfaz-app").classList.remove("hidden");
     const info = document.getElementById("info-usuario");
-    if(info) info.innerHTML = `<div class="flex flex-col items-center"><div class="w-8 h-8 bg-white border rounded-full flex items-center justify-center text-indigo-500 mb-1"><i class="fas fa-user"></i></div><span class="font-bold text-slate-700">${d.id}</span><span class="text-[10px] uppercase font-bold text-indigo-400 bg-indigo-50 px-2 rounded-full mt-1">${d.rol}</span></div>`;
+    if(info) info.innerHTML = `<div class="flex flex-col items-center"><div class="w-8 h-8 bg-white border rounded-full flex items-center justify-center text-indigo-500 mb-1"><i class="fas fa-user"></i></div><span class="font-bold text-slate-700 uppercase">${d.id}</span><span class="text-[10px] uppercase font-bold text-indigo-400 bg-indigo-50 px-2 rounded-full mt-1">${d.rol}</span></div>`;
     if(['admin','manager'].includes(d.rol)) document.getElementById("btn-admin-stock")?.classList.remove("hidden");
     configurarMenu(); window.verPagina(['admin','manager','supervisor'].includes(d.rol)?'stats':'stock');
     activarSincronizacion();
@@ -55,7 +56,7 @@ window.iniciarSesion = async () => {
 };
 window.cerrarSesion = () => { localStorage.removeItem("fcilog_session"); location.reload(); };
 
-// UI & MENU MÓVIL (CORREGIDO)
+// --- NAVEGACIÓN Y MENÚ MÓVIL (CORREGIDO) ---
 window.verPagina = (id) => {
     document.querySelectorAll(".view").forEach(v => {v.classList.add("hidden"); v.classList.remove("animate-fade-in")});
     const t = document.getElementById(`pag-${id}`);
@@ -63,20 +64,24 @@ window.verPagina = (id) => {
     if(window.innerWidth<768) window.toggleMenu(false); // Cerrar menú al navegar
 };
 
-// Función Toggle Menú Corregida
+// Esta función maneja la apertura/cierre del menú con clases CSS
 window.toggleMenu = (forceState) => {
-    const sb = document.getElementById("sidebar");
-    const ov = document.getElementById("sidebar-overlay");
-    const isClosed = sb.classList.contains("-translate-x-full");
-    // Si forceState está definido, úsalo. Si no, invierte el estado actual.
+    const sidebar = document.getElementById("sidebar");
+    const overlay = document.getElementById("sidebar-overlay");
+    
+    // Si forceState es null/undefined, invertimos el estado actual
+    const isClosed = sidebar.classList.contains("-translate-x-full");
     const shouldOpen = forceState !== undefined ? forceState : isClosed;
 
     if (shouldOpen) {
-        sb.classList.remove("-translate-x-full");
-        ov.classList.remove("hidden");
+        sidebar.classList.remove("-translate-x-full");
+        overlay.classList.remove("hidden");
+        // Asegurar Z-Index alto al abrir
+        overlay.style.zIndex = "90";
+        sidebar.style.zIndex = "100";
     } else {
-        sb.classList.add("-translate-x-full");
-        ov.classList.add("hidden");
+        sidebar.classList.add("-translate-x-full");
+        overlay.classList.add("hidden");
     }
 };
 
@@ -105,7 +110,7 @@ async function enviarNotificacionGrupo(tipo, datos) {
         case 'nuevo_pedido': config.asunto = `📦 Nuevo Pedido de ${datos.usuario}`; config.titulo_principal = "🚀 Solicitud Recibida"; config.mensaje_cuerpo = `El usuario ${datos.usuario} ha solicitado:\n\n${lista}\n\n📍 Sede: ${datos.sede}`; break;
         case 'aprobado_parcial': config.asunto = `✅ Actualización de Pedido`; config.titulo_principal = "Estado de Solicitud"; config.mensaje_cuerpo = `Hola ${datos.usuario},\n\nSe ha gestionado tu solicitud de:\n\n${lista}\n\nRevisa "Mis Pedidos" para ver el detalle.`; break;
         case 'stock_bajo': config.asunto = `⚠️ ALERTA STOCK: ${datos.insumo}`; config.titulo_principal = "Stock Crítico"; config.mensaje_cuerpo = `El insumo ${datos.insumo} está bajo mínimos.\nActual: ${datos.actual}\nMínimo: ${datos.minimo}`; break;
-        case 'recibido': config.asunto = `🔵 Entrega Confirmada - ${datos.sede}`; config.titulo_principal = "Recepción Exitosa"; config.mensaje_cuerpo = `El usuario ${datos.usuario} confirmó la recepción de:\n\n• ${datos.insumo} (x${datos.cantidad})`; break;
+        case 'recibido': config.asunto = `🔵 Entrega Confirmada - ${datos.sede}`; config.titulo_principal = "Recepción Exitosa"; config.mensaje_cuerpo = `El usuario ${datos.usuario} confirmó la recepción de:\n\n${lista}`; break;
     }
     try { await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, { asunto: config.asunto, titulo_principal: config.titulo_principal, mensaje_cuerpo: config.mensaje_cuerpo, to_email: config.to_email, fecha: config.fecha }); } catch (e) { console.error(e); }
 }
@@ -116,8 +121,7 @@ window.ajustarCantidad=(i,d)=>{const n=Math.max(0,(carritoGlobal[i]||0)+d); carr
 window.procesarSolicitudMultiple = async () => {
     const ubi = document.getElementById("sol-ubicacion").value, items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
     if(!ubi || items.length === 0) return alert("Seleccione sede y productos.");
-    const batchId = Date.now().toString(); 
-    const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
+    const batchId = Date.now().toString(); const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
     await Promise.all(items.map(async ([ins, cant]) => {
         await addDoc(collection(db, "pedidos"), { usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now(), batchId: batchId });
     }));
@@ -125,94 +129,32 @@ window.procesarSolicitudMultiple = async () => {
     alert("✅ Solicitud enviada."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina('notificaciones');
 };
 
-// DASHBOARD FILTRADO
-window.renderDashboard = () => {
-    if (!allPedidos.length) return;
-
-    // Obtener valores de filtros
-    const fFecha = document.getElementById("dash-filtro-fecha").value;
-    const fSede = document.getElementById("dash-filtro-sede").value;
-    const fUser = document.getElementById("dash-filtro-user").value;
-
-    const ahora = new Date();
-    const mesActual = ahora.getMonth();
-    const anoActual = ahora.getFullYear();
-
-    // Filtrar datos
-    const pedidosFiltrados = allPedidos.filter(p => {
-        const pDate = new Date(p.timestamp);
-        // Filtro Fecha
-        let passFecha = true;
-        if (fFecha === 'mes_actual') passFecha = (pDate.getMonth() === mesActual && pDate.getFullYear() === anoActual);
-        if (fFecha === 'mes_anterior') passFecha = (pDate.getMonth() === (mesActual - 1) && pDate.getFullYear() === anoActual); // Simplificado
-        
-        // Filtro Sede
-        const passSede = fSede === 'todas' || p.ubicacion === fSede;
-        // Filtro Usuario
-        const passUser = fUser === 'todos' || p.usuarioId === fUser;
-
-        return passFecha && passSede && passUser;
-    });
-
-    // Calcular Métricas
-    const pendientes = pedidosFiltrados.filter(p => p.estado === 'pendiente').length;
-    const entregados = pedidosFiltrados.filter(p => p.estado === 'recibido' || p.estado === 'aprobado').length;
-
-    // Calcular Datos Gráficas
-    const insumosCount = {};
-    const sedesCount = {};
-
-    pedidosFiltrados.forEach(p => {
-        if (p.estado !== 'rechazado') {
-            insumosCount[p.insumoNom] = (insumosCount[p.insumoNom] || 0) + p.cantidad;
-            sedesCount[p.ubicacion] = (sedesCount[p.ubicacion] || 0) + p.cantidad;
-        }
-    });
-
-    // Top 10 Insumos
-    const topInsumos = Object.entries(insumosCount).sort((a,b) => b[1] - a[1]).slice(0, 10);
-    const labelsIns = topInsumos.map(x => x[0].substring(0,10));
-    const dataIns = topInsumos.map(x => x[1]);
-
-    // Sedes
-    const labelsSedes = Object.keys(sedesCount);
-    const dataSedes = Object.values(sedesCount);
-
-    // Actualizar UI
-    document.getElementById("metrica-entregados").innerText = entregados;
-    document.getElementById("metrica-pendientes").innerText = pendientes;
-
-    // Renderizar Gráficas
-    renderChart('chart-insumos', labelsIns, dataIns, 'Insumos', '#6366f1', stockChart, c => stockChart = c);
-    renderChart('chart-sedes', labelsSedes, dataSedes, 'Sedes', '#10b981', locationChart, c => locationChart = c);
-};
-
-// SINCRONIZACIÓN Y CARGA DE FILTROS
+// SINCRONIZACIÓN (Con lógica de Stock)
 function activarSincronizacion() {
-    // STOCK
     onSnapshot(collection(db, "inventario"), snap => {
         const g=document.getElementById("lista-inventario"), c=document.getElementById("contenedor-lista-pedidos"), d=document.getElementById("lista-sugerencias");
         if(g)g.innerHTML=""; if(c)c.innerHTML=""; if(d)d.innerHTML="";
-        let tr=0, ts=0;
-        snap.forEach(ds=>{ const p=ds.data(), n=ds.id.toUpperCase(); tr++; ts+=p.cantidad; if(d)d.innerHTML+=`<option value="${n}">`;
+        let tr=0, ts=0, lb=[], dt=[];
+        
+        snap.forEach(ds=>{ const p=ds.data(), n=ds.id.toUpperCase(); tr++; ts+=p.cantidad; lb.push(n.slice(0,10)); dt.push(p.cantidad);
+            // Llenar el Datalist para el input de stock
+            if(d) d.innerHTML+=`<option value="${n}">`; 
+            
             const adm=['admin','manager'].includes(usuarioActual.rol), acts=adm?`<div class="flex gap-2"><button onclick="prepararEdicionProducto('${ds.id}')" class="text-slate-300 hover:text-indigo-500"><i class="fas fa-cog"></i></button><button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button></div>`:'';
             const img=p.imagen?`<img src="${p.imagen}" class="w-12 h-12 object-cover rounded-lg border mb-2">`:`<div class="w-12 h-12 bg-slate-50 rounded-lg border flex items-center justify-center text-slate-300 mb-2"><i class="fas fa-image"></i></div>`;
             const isLow = (p.stockMinimo && p.cantidad<=p.stockMinimo);
             const border = isLow ? "border-2 border-red-500 bg-red-50" : "border border-slate-100 bg-white";
             const price = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
-            if(g)g.innerHTML+=`<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-sm truncate">${n}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
+            const alertIco = isLow ? `<i class="fas fa-exclamation-circle text-red-500 animate-pulse ml-1"></i>` : '';
+
+            if(g)g.innerHTML+=`<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-sm truncate" title="${n}">${n} ${alertIco}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
             if(c&&p.cantidad>0){ const inC=carritoGlobal[ds.id]||0, act=inC>0?"border-indigo-500 bg-indigo-50/50":"border-transparent bg-white"; c.innerHTML+=`<div id="row-${ds.id}" class="flex items-center justify-between p-3 rounded-xl border ${act} transition-all shadow-sm"><div class="flex items-center gap-3 overflow-hidden">${p.imagen?`<img src="${p.imagen}" class="w-8 h-8 rounded-md object-cover">`:''}<div class="truncate"><p class="font-bold text-xs uppercase text-slate-700 truncate">${n}</p><p class="text-[10px] text-slate-400">Disp: ${p.cantidad}</p></div></div><div class="flex items-center gap-2 bg-white rounded-lg p-1 border flex-shrink-0"><button onclick="ajustarCantidad('${ds.id}', -1)" class="w-7 h-7 rounded-md bg-slate-50 font-bold">-</button><span id="cant-${ds.id}" class="w-6 text-center font-bold text-indigo-600 text-sm">${inC}</span><button onclick="ajustarCantidad('${ds.id}', 1)" class="w-7 h-7 rounded-md bg-indigo-50 font-bold" ${inC>=p.cantidad?'disabled':''}>+</button></div></div>`; }
         });
-        if(document.getElementById("metrica-stock")){ document.getElementById("metrica-total").innerText=tr; document.getElementById("metrica-stock").innerText=ts; }
+        if(document.getElementById("metrica-stock")){ document.getElementById("metrica-total").innerText=tr; document.getElementById("metrica-stock").innerText=ts; renderChart('stockChart',lb,dt,'Stock','#6366f1',stockChart,c=>stockChart=c); }
     });
 
-    // PEDIDOS (GLOBAL)
     onSnapshot(collection(db,"pedidos"), s=>{
-        allPedidos = []; // Guardar todo para filtrado
-        let grupos = {}, pendingCount = 0;
-        const sedesSet = new Set(), usersSet = new Set(); // Para llenar selects
-
-        // Elementos UI
+        pedidosRaw = []; let grupos = {}, pendingCount = 0;
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lActive = document.getElementById("tab-content-activos");
         const lHistory = document.getElementById("tab-content-historial");
@@ -221,19 +163,14 @@ function activarSincronizacion() {
         if(lAdmin) lAdmin.innerHTML=""; if(lActive) lActive.innerHTML=""; if(lHistory) lHistory.innerHTML=""; if(tHist) tHist.innerHTML="";
 
         s.forEach(ds => {
-            const p = ds.data(); p.id = ds.id; allPedidos.push(p);
-            sedesSet.add(p.ubicacion); usersSet.add(p.usuarioId);
-
+            const p = ds.data(); p.id = ds.id; pedidosRaw.push(p);
             const bKey = p.batchId || p.timestamp;
             if(!grupos[bKey]) grupos[bKey] = { items:[], user:p.usuarioId, sede:p.ubicacion, date:p.fecha, ts:p.timestamp };
             grupos[bKey].items.push(p);
 
             if(p.estado==='pendiente') pendingCount++;
-
-            // Historial Tabla
             if(p.estado!=='pendiente'&&tHist) tHist.innerHTML+=`<tr class="hover:bg-slate-50"><td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase">${p.insumoNom}</td><td class="p-4">x${p.cantidad}</td><td class="p-4 text-indigo-600 font-bold">${p.ubicacion}</td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td></tr>`;
 
-            // Usuario Tabs
             if(p.usuarioId===usuarioActual.id) {
                 let btns = "";
                 if(p.estado==='aprobado') btns=`<div class="mt-2 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border text-slate-500 px-3 py-1 rounded text-xs">Reportar</button></div>`;
@@ -243,7 +180,6 @@ function activarSincronizacion() {
             }
         });
 
-        // Admin Group View
         if(lAdmin && ['admin','manager','supervisor'].includes(usuarioActual.rol)) {
             Object.values(grupos).sort((a,b)=>b.ts-a.ts).forEach(g => {
                 const pendingItems = g.items.filter(i=>i.estado==='pendiente');
@@ -253,33 +189,13 @@ function activarSincronizacion() {
                 }
             });
         }
-
-        // Llenar selects del Dashboard
-        const selSede = document.getElementById("dash-filtro-sede");
-        const selUser = document.getElementById("dash-filtro-user");
-        if(selSede && selUser) {
-            // Guardar selección actual para no resetearla
-            const currentSede = selSede.value;
-            const currentUser = selUser.value;
-            
-            selSede.innerHTML = '<option value="todas">🏢 Todas las Sedes</option>';
-            sedesSet.forEach(s => selSede.innerHTML += `<option value="${s}">${s}</option>`);
-            selSede.value = currentSede;
-
-            selUser.innerHTML = '<option value="todos">👤 Todos los Usuarios</option>';
-            usersSet.forEach(u => selUser.innerHTML += `<option value="${u}">${u}</option>`);
-            selUser.value = currentUser;
-        }
-
-        // Render inicial del dashboard
-        if(['admin','manager','supervisor'].includes(usuarioActual.rol)) renderDashboard();
+        if(document.getElementById("metrica-pedidos")) document.getElementById("metrica-pedidos").innerText=pendingCount;
     });
 
     onSnapshot(collection(db,"entradas_stock"),s=>{const t=document.getElementById("tabla-entradas-body");if(t){t.innerHTML="";let d=[];s.forEach(x=>d.push(x.data()));d.sort((a,b)=>b.timestamp-a.timestamp);d.forEach(e=>{t.innerHTML+=`<tr class="hover:bg-emerald-50/30"><td class="p-4 text-xs">${e.fecha}</td><td class="p-4 font-bold uppercase text-emerald-900">${e.insumo}</td><td class="p-4 font-black text-emerald-600">+${e.cantidad}</td><td class="p-4 text-xs uppercase">${e.usuario}</td></tr>`;});}});
-    if(usuarioActual.rol==='admin') onSnapshot(collection(db,"usuarios"),s=>{const l=document.getElementById("lista-usuarios-db");if(l){l.innerHTML="";s.forEach(d=>{const u=d.data();l.innerHTML+=`<div class="bg-white p-4 rounded-xl border flex justify-between items-center"><div><span class="font-bold">${d.id}</span> <span class="text-[10px] bg-slate-100 px-2 rounded uppercase">${u.rol}</span><br><span class="text-xs text-slate-400">${u.email||'-'}</span></div><div class="flex gap-2"><button onclick="prepararEdicionUsuario('${d.id}','${u.pass}','${u.rol}','${u.email||''}')" class="text-indigo-500"><i class="fas fa-pen"></i></button><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`;});}});
+    if(usuarioActual.rol==='admin') onSnapshot(collection(db,"usuarios"),s=>{const l=document.getElementById("lista-usuarios-db");if(l){l.innerHTML="";s.forEach(d=>{const u=d.data();l.innerHTML+=`<div class="bg-white p-4 rounded-xl border flex justify-between items-center"><div><span class="font-bold uppercase">${d.id}</span> <span class="text-[10px] bg-slate-100 px-2 rounded uppercase">${u.rol}</span><br><span class="text-xs text-slate-400">${u.email||'-'}</span></div><div class="flex gap-2"><button onclick="prepararEdicionUsuario('${d.id}','${u.pass}','${u.rol}','${u.email||''}')" class="text-indigo-500"><i class="fas fa-pen"></i></button><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`;});}});
 }
 
-// RESTO DE FUNCIONES (Gestión, Modales, Excel - Mantenidos igual)
 window.abrirModalGrupo = (bKey) => {
     const m = document.getElementById("modal-grupo-admin"), c = document.getElementById("modal-grupo-contenido"), t = document.getElementById("modal-grupo-titulo");
     const items = pedidosRaw.filter(p => (p.batchId === bKey) || (p.timestamp.toString() === bKey));
@@ -309,11 +225,15 @@ window.gestionarPedido = async (pid, accion, ins) => {
             const newStock = iSnap.data().cantidad - val;
             await updateDoc(iRef, { cantidad: newStock });
             await updateDoc(pRef, { estado: "aprobado", cantidad: val });
-            if(emailSolicitante) enviarNotificacionGrupo('aprobado_parcial', { usuario: pData.usuarioId, items: [{insumo:ins, cantidad:val}], target_email: emailSolicitante });
-            if (newStock <= (iSnap.data().stockMinimo||0)) enviarNotificacionGrupo('stock_bajo', { insumo: ins, actual: newStock, minimo: iSnap.data().stockMinimo });
+            
+            if(newStock <= (iSnap.data().stockMinimo||0)) enviarNotificacionGrupo('stock_bajo', { insumo: ins, actual: newStock, minimo: iSnap.data().stockMinimo });
+            
             const pendientes = pedidosRaw.filter(p => (p.batchId === pData.batchId) && p.estado === 'pendiente' && p.id !== pid);
             if(pendientes.length === 0) document.getElementById("modal-grupo-admin").classList.add("hidden");
-            else window.abrirModalGrupo(pData.batchId);
+            else window.abrirModalGrupo(pData.batchId); 
+
+            if(emailSolicitante) enviarNotificacionGrupo('aprobado_parcial', { usuario: pData.usuarioId, items: [{insumo:ins, cantidad:val}], target_email: emailSolicitante });
+
         } else alert("Stock insuficiente");
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
@@ -329,7 +249,45 @@ window.confirmarRecibido = async (pid) => {
     }
 };
 
-window.agregarProductoRápido=async()=>{const n=document.getElementById("nombre-prod").value.trim().toUpperCase(), c=parseInt(document.getElementById("cantidad-prod").value); if(n&&c>0){const i=n.toLowerCase(),r=doc(db,"inventario",i),s=await getDoc(r); if(s.exists())await updateDoc(r,{cantidad:s.data().cantidad+c}); else await setDoc(r,{cantidad:c}); await addDoc(collection(db,"entradas_stock"),{insumo:n,cantidad:c,usuario:usuarioActual.id,fecha:new Date().toLocaleString(),timestamp:Date.now()}); cerrarModalInsumo(); document.getElementById("nombre-prod").value=""; document.getElementById("cantidad-prod").value="";}else alert("Datos inválidos");};
+// --- LOGICA ENTRADA RAPIDA (SIN DUPLICIDAD) ---
+window.agregarProductoRápido = async () => {
+    // Tomamos el valor, limpiamos espacios y mayúsculas
+    const nombre = document.getElementById("nombre-prod").value.trim().toUpperCase();
+    const cantidad = parseInt(document.getElementById("cantidad-prod").value);
+
+    if (nombre && cantidad > 0) {
+        // ID en minúsculas para consistencia en la BD
+        const id = nombre.toLowerCase();
+        const ref = doc(db, "inventario", id);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+            // Si ya existe, SUMAMOS
+            await updateDoc(ref, { cantidad: snap.data().cantidad + cantidad });
+            alert(`✅ Se agregaron ${cantidad} unidades a ${nombre}`);
+        } else {
+            // Si no existe, CREAMOS
+            if(confirm(`El producto "${nombre}" no existe. ¿Deseas crearlo nuevo?`)) {
+                await setDoc(ref, { cantidad: cantidad });
+                alert(`✅ Producto ${nombre} creado con ${cantidad} unidades.`);
+            } else {
+                return; // Cancelar si el usuario no quiere crear
+            }
+        }
+        
+        await addDoc(collection(db, "entradas_stock"), { 
+            insumo: nombre, cantidad: cantidad, usuario: usuarioActual.id, 
+            fecha: new Date().toLocaleString(), timestamp: Date.now() 
+        });
+        
+        cerrarModalInsumo(); 
+        document.getElementById("nombre-prod").value=""; 
+        document.getElementById("cantidad-prod").value="";
+    } else {
+        alert("Ingrese un nombre y una cantidad válida.");
+    }
+};
+
 window.prepararEdicionProducto=async(id)=>{const s=await getDoc(doc(db,"inventario",id)); if(!s.exists())return; const d=s.data(); document.getElementById('edit-prod-id').value=id; document.getElementById('edit-prod-precio').value=d.precio||''; document.getElementById('edit-prod-min').value=d.stockMinimo||''; document.getElementById('edit-prod-img').value=d.imagen||''; if(d.imagen)document.getElementById('preview-img').src=d.imagen,document.getElementById('preview-img').classList.remove('hidden'); document.getElementById('modal-detalles').classList.remove('hidden');};
 window.guardarDetallesProducto=async()=>{const id=document.getElementById('edit-prod-id').value, p=parseFloat(document.getElementById('edit-prod-precio').value)||0, m=parseInt(document.getElementById('edit-prod-min').value)||0, i=document.getElementById('edit-prod-img').value; await updateDoc(doc(db,"inventario",id),{precio:p,stockMinimo:m,imagen:i}); cerrarModalDetalles(); alert("Guardado");};
 window.guardarUsuario=async()=>{const id=document.getElementById("new-user").value.trim().toLowerCase(), p=document.getElementById("new-pass").value.trim(), e=document.getElementById("new-email").value.trim(), r=document.getElementById("new-role").value; if(!id||!p)return alert("Faltan datos"); await setDoc(doc(db,"usuarios",id),{pass:p,rol:r,email:e},{merge:true}); alert("Guardado"); cancelarEdicionUsuario();};
