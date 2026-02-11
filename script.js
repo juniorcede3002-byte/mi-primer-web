@@ -1,18 +1,17 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// --- CONFIG ---
+// --- TUS LLAVES ---
 const firebaseConfig = { apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8", authDomain: "mi-web-db.firebaseapp.com", projectId: "mi-web-db", storageBucket: "mi-web-db.appspot.com" };
 const CLOUD_NAME = 'df79cjklp'; const UPLOAD_PRESET = 'insumos'; 
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; const EMAIL_TEMPLATE_ID = 'template_mlcofoo'; const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
-const ADMIN_EMAIL = 'juniorcede3002@gmail.com'; 
+const ADMIN_EMAIL = 'archivos@fcipty.com'; 
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let usuarioActual = null, stockChart=null, userChart=null, locationChart=null, carritoGlobal={}, cloudinaryWidget=null;
-// Para almacenar datos crudos y poder agruparlos
-let pedidosRaw = []; 
+let pedidosRaw = []; // Para agrupar
 
 emailjs.init(EMAIL_PUBLIC_KEY);
 
@@ -22,7 +21,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupCloudinary();
 });
 
-// --- CLOUDINARY ---
+// CLOUDINARY
 function setupCloudinary() {
     if(typeof cloudinary!=="undefined") {
         cloudinaryWidget = cloudinary.createUploadWidget({ cloudName: CLOUD_NAME, uploadPreset: UPLOAD_PRESET, sources: ['local','camera'], multiple:false, cropping:true, folder:'fcilog_insumos' }, (error, result) => { 
@@ -37,7 +36,7 @@ function setupCloudinary() {
     }
 }
 
-// --- SESIÓN ---
+// SESIÓN
 function cargarSesion(d) {
     usuarioActual = d; localStorage.setItem("fcilog_session", JSON.stringify(d));
     document.getElementById("pantalla-login").classList.add("hidden");
@@ -57,7 +56,7 @@ window.iniciarSesion = async () => {
 };
 window.cerrarSesion = () => { localStorage.removeItem("fcilog_session"); location.reload(); };
 
-// --- UI ---
+// UI TABS
 window.verPagina = (id) => {
     document.querySelectorAll(".view").forEach(v => {v.classList.add("hidden"); v.classList.remove("animate-fade-in")});
     const t = document.getElementById(`pag-${id}`);
@@ -72,42 +71,36 @@ window.toggleMenu = (f) => {
 window.switchTab = (tab) => {
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
     document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
-    // Estilos botones
     const btnA = document.getElementById('tab-btn-activos'), btnH = document.getElementById('tab-btn-historial');
-    if(tab === 'activos') {
-        btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm";
-        btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all";
-    } else {
-        btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm";
-        btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all";
-    }
+    if(tab === 'activos') { btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm"; btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; } 
+    else { btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm"; btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; }
 };
 
 function configurarMenu() {
     const rol = usuarioActual.rol, menu = document.getElementById("menu-dinamico");
-    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Historial',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Pedidos',i:'shipping-fast'} };
+    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Historial',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Solicitudes',i:'shipping-fast'} };
     let r = [];
     if(rol==='admin') r=[i.st,i.sk,i.pd,i.pe,i.hs,i.us,i.mp]; else if(rol==='manager'||rol==='supervisor') r=[i.st,i.sk,i.pd,i.pe,i.hs,i.mp]; else r=[i.sk,i.pd,i.mp];
     menu.innerHTML = r.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
 }
 
-// --- NOTIFICACIONES (AGRUPADAS) ---
+// NOTIFICACIONES (SOLO UN CORREO POR GRUPO)
 async function enviarNotificacionGrupo(tipo, datos) {
     let config = { to_email: datos.target_email || ADMIN_EMAIL, asunto: "", titulo_principal: "", mensaje_cuerpo: "", fecha: new Date().toLocaleString() };
     
-    // Lista formateada
-    const listaInsumos = datos.items.map(i => `• ${i.insumo.toUpperCase()} (x${i.cantidad})`).join('\n');
+    // Convertir array de items a texto bonito
+    const lista = datos.items ? datos.items.map(i => `• ${i.insumo.toUpperCase()} (x${i.cantidad})`).join('\n') : "";
 
     switch (tipo) {
         case 'nuevo_pedido':
             config.asunto = `📦 Nuevo Pedido de ${datos.usuario}`;
             config.titulo_principal = "🚀 Solicitud Recibida";
-            config.mensaje_cuerpo = `El usuario ${datos.usuario} ha solicitado:\n\n${listaInsumos}\n\n📍 Sede: ${datos.sede}\n\nIngresa al sistema para aprobar.`;
+            config.mensaje_cuerpo = `El usuario ${datos.usuario} ha solicitado:\n\n${lista}\n\n📍 Sede: ${datos.sede}`;
             break;
-        case 'aprobado_parcial': // O aprobado total
+        case 'aprobado_parcial':
             config.asunto = `✅ Actualización de Pedido`;
             config.titulo_principal = "Estado de Solicitud";
-            config.mensaje_cuerpo = `Hola ${datos.usuario},\n\nSe ha gestionado tu solicitud de ${datos.items[0].insumo} (y otros).\nRevisa "Mis Pedidos" para ver el detalle.`;
+            config.mensaje_cuerpo = `Hola ${datos.usuario},\n\nSe ha gestionado tu solicitud de:\n\n${lista}\n\nRevisa "Mis Pedidos" para ver el detalle.`;
             break;
         case 'stock_bajo':
             config.asunto = `⚠️ ALERTA STOCK: ${datos.insumo}`;
@@ -117,59 +110,72 @@ async function enviarNotificacionGrupo(tipo, datos) {
         case 'recibido':
             config.asunto = `🔵 Entrega Confirmada - ${datos.sede}`;
             config.titulo_principal = "Recepción Exitosa";
-            config.mensaje_cuerpo = `El usuario ${datos.usuario} confirmó la recepción de:\n\n• ${datos.insumo} (x${datos.cantidad})`;
+            config.mensaje_cuerpo = `El usuario ${datos.usuario} confirmó la recepción de:\n\n${lista}`;
             break;
     }
-
     try { await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, { asunto: config.asunto, titulo_principal: config.titulo_principal, mensaje_cuerpo: config.mensaje_cuerpo, to_email: config.to_email, fecha: config.fecha }); } catch (e) { console.error(e); }
 }
 
-// --- LÓGICA PEDIDOS (BATCH) ---
+// PEDIDOS (BATCH)
 window.ajustarCantidad=(i,d)=>{const n=Math.max(0,(carritoGlobal[i]||0)+d); carritoGlobal[i]=n; document.getElementById(`cant-${i}`).innerText=n; document.getElementById(`row-${i}`).classList.toggle("border-indigo-500",n>0);};
 
 window.procesarSolicitudMultiple = async () => {
     const ubi = document.getElementById("sol-ubicacion").value, items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
     if(!ubi || items.length === 0) return alert("Seleccione sede y productos.");
     
-    const batchId = Date.now().toString(); // ID Único del grupo
-    const itemsData = [];
+    const batchId = Date.now().toString(); 
+    const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
 
     await Promise.all(items.map(async ([ins, cant]) => {
-        itemsData.push({ insumo: ins, cantidad: cant });
         await addDoc(collection(db, "pedidos"), { 
             usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi, 
             estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now(),
-            batchId: batchId // Agrupador
+            batchId: batchId 
         });
     }));
 
-    // Enviar UN SOLO CORREO
     enviarNotificacionGrupo('nuevo_pedido', { usuario: usuarioActual.id, sede: ubi, items: itemsData });
-
     alert("✅ Solicitud enviada."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina('notificaciones');
 };
 
-// --- SINCRONIZACIÓN ---
+// SINCRONIZACIÓN
 function activarSincronizacion() {
-    // 1. STOCK
+    // 1. INVENTARIO (LISTA DESPLEGABLE Y BORDE ROJO)
     onSnapshot(collection(db, "inventario"), snap => {
         const g=document.getElementById("lista-inventario"), c=document.getElementById("contenedor-lista-pedidos"), d=document.getElementById("lista-sugerencias");
         if(g)g.innerHTML=""; if(c)c.innerHTML=""; if(d)d.innerHTML="";
         let tr=0, ts=0, lb=[], dt=[];
-        snap.forEach(ds=>{ const p=ds.data(), n=ds.id.toUpperCase(); tr++; ts+=p.cantidad; lb.push(n.slice(0,10)); dt.push(p.cantidad); if(d)d.innerHTML+=`<option value="${n}">`;
+        
+        snap.forEach(ds=>{ const p=ds.data(), n=ds.id.toUpperCase(); tr++; ts+=p.cantidad; lb.push(n.slice(0,10)); dt.push(p.cantidad);
+            if(d)d.innerHTML+=`<option value="${n}">`; // Datalist para autocomplete
+            
             const adm=['admin','manager'].includes(usuarioActual.rol), acts=adm?`<div class="flex gap-2"><button onclick="prepararEdicionProducto('${ds.id}')" class="text-slate-300 hover:text-indigo-500"><i class="fas fa-cog"></i></button><button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button></div>`:'';
             const img=p.imagen?`<img src="${p.imagen}" class="w-12 h-12 object-cover rounded-lg border mb-2">`:`<div class="w-12 h-12 bg-slate-50 rounded-lg border flex items-center justify-center text-slate-300 mb-2"><i class="fas fa-image"></i></div>`;
-            const alert=(p.stockMinimo&&p.cantidad<=p.stockMinimo)?`<i class="fas fa-exclamation-circle text-red-500 animate-pulse ml-1"></i>`:'';
-            if(g)g.innerHTML+=`<div class="bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-sm truncate">${n} ${alert}</h4><p class="text-2xl font-black text-slate-800">${p.cantidad}</p></div>`;
+            const precio = p.precio ? `<span class="text-emerald-600 font-bold text-sm">$${p.precio}</span>` : '';
+            
+            // Lógica Borde Rojo (Stock Bajo)
+            const isLow = (p.stockMinimo && p.cantidad <= p.stockMinimo);
+            const borderClass = isLow ? "border-2 border-red-500 bg-red-50" : "border border-slate-100 bg-white";
+            const alertIcon = isLow ? `<i class="fas fa-exclamation-circle text-red-500 animate-pulse ml-1" title="Stock Bajo"></i>` : '';
+
+            if(g)g.innerHTML+=`
+            <div class="${borderClass} p-4 rounded-2xl shadow-sm hover:shadow-md transition">
+                <div class="flex justify-between items-start">${img}${acts}</div>
+                <h4 class="font-bold text-slate-700 text-sm truncate">${n} ${alertIcon}</h4>
+                <div class="flex justify-between items-end mt-1">
+                    <p class="text-2xl font-black text-slate-800">${p.cantidad}</p>
+                    ${precio}
+                </div>
+            </div>`;
+
             if(c&&p.cantidad>0){ const inC=carritoGlobal[ds.id]||0, act=inC>0?"border-indigo-500 bg-indigo-50/50":"border-transparent bg-white"; c.innerHTML+=`<div id="row-${ds.id}" class="flex items-center justify-between p-3 rounded-xl border ${act} transition-all shadow-sm"><div class="flex items-center gap-3 overflow-hidden">${p.imagen?`<img src="${p.imagen}" class="w-8 h-8 rounded-md object-cover">`:''}<div class="truncate"><p class="font-bold text-xs uppercase text-slate-700 truncate">${n}</p><p class="text-[10px] text-slate-400">Disp: ${p.cantidad}</p></div></div><div class="flex items-center gap-2 bg-white rounded-lg p-1 border flex-shrink-0"><button onclick="ajustarCantidad('${ds.id}', -1)" class="w-7 h-7 rounded-md bg-slate-50 font-bold">-</button><span id="cant-${ds.id}" class="w-6 text-center font-bold text-indigo-600 text-sm">${inC}</span><button onclick="ajustarCantidad('${ds.id}', 1)" class="w-7 h-7 rounded-md bg-indigo-50 font-bold" ${inC>=p.cantidad?'disabled':''}>+</button></div></div>`; }
         });
         if(document.getElementById("metrica-stock")){ document.getElementById("metrica-total").innerText=tr; document.getElementById("metrica-stock").innerText=ts; renderChart('stockChart',lb,dt,'Stock','#6366f1',stockChart,c=>stockChart=c); }
     });
 
-    // 2. PEDIDOS (AGRUPACIÓN)
+    // 2. PEDIDOS
     onSnapshot(collection(db,"pedidos"), s=>{
-        pedidosRaw = [];
-        let grupos = {}, pendingCount = 0;
+        pedidosRaw = []; let grupos = {}, pendingCount = 0;
         const lAdmin = document.getElementById("lista-pendientes-admin");
         const lActive = document.getElementById("tab-content-activos");
         const lHistory = document.getElementById("tab-content-historial");
@@ -187,14 +193,15 @@ function activarSincronizacion() {
 
             if(p.estado==='pendiente') pendingCount++;
 
-            // TABLA HISTORIAL (Individual)
+            // Historial (Tabla)
             if(p.estado!=='pendiente'&&tHist) tHist.innerHTML+=`<tr class="hover:bg-slate-50"><td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase">${p.insumoNom}</td><td class="p-4">x${p.cantidad}</td><td class="p-4 text-indigo-600 font-bold">${p.ubicacion}</td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td></tr>`;
 
-            // VISTA USUARIO (TABS)
+            // USUARIO TABS (Separar Pendiente/Recibido)
             if(p.usuarioId===usuarioActual.id) {
                 let btns = "";
                 if(p.estado==='aprobado') btns=`<div class="mt-2 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border text-slate-500 px-3 py-1 rounded text-xs">Reportar</button></div>`;
-                if(p.estado==='recibido') btns=`<div class="mt-2 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-500 text-xs hover:underline"><i class="fas fa-exclamation-circle"></i> Devolver</button></div>`;
+                // Botón devolver SIEMPRE disponible en historial
+                if(p.estado==='recibido' || p.estado==='devuelto') btns=`<div class="mt-2 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-500 text-xs hover:underline flex items-center gap-1"><i class="fas fa-undo"></i> Devolver / Reportar</button></div>`;
                 
                 const card = `<div class="bg-white p-4 rounded-xl border shadow-sm"><div class="flex justify-between"><div><span class="badge status-${p.estado}">${p.estado}</span><h4 class="font-bold text-sm mt-1 uppercase">${p.insumoNom}</h4><p class="text-xs text-slate-400">x${p.cantidad} • ${p.ubicacion}</p></div></div>${btns}</div>`;
                 
@@ -203,7 +210,7 @@ function activarSincronizacion() {
             }
         });
 
-        // VISTA ADMIN (GRUPOS)
+        // ADMIN GROUP VIEW
         if(lAdmin && ['admin','manager','supervisor'].includes(usuarioActual.rol)) {
             Object.values(grupos).sort((a,b)=>b.ts-a.ts).forEach(g => {
                 const pendingItems = g.items.filter(i=>i.estado==='pendiente');
@@ -211,10 +218,7 @@ function activarSincronizacion() {
                     const itemsStr = pendingItems.map(i=>`<span class="bg-slate-100 px-2 py-1 rounded text-xs border">${i.insumoNom} (x${i.cantidad})</span>`).join('');
                     lAdmin.innerHTML += `
                     <div class="bg-white p-4 rounded-2xl border-l-4 border-l-amber-400 shadow-sm cursor-pointer hover:shadow-md transition" onclick="abrirModalGrupo('${g.items[0].batchId || g.ts}')">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-bold text-slate-800 text-sm">${g.user}</h4>
-                            <span class="text-xs text-slate-400">${g.sede} • ${pendingItems.length} items</span>
-                        </div>
+                        <div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-800 text-sm">${g.user}</h4><span class="text-xs text-slate-400">${g.sede} • ${pendingItems.length} items</span></div>
                         <div class="flex flex-wrap gap-1">${itemsStr}</div>
                         <div class="mt-2 text-center text-xs text-indigo-500 font-bold">Ver Detalles <i class="fas fa-chevron-right"></i></div>
                     </div>`;
@@ -228,13 +232,12 @@ function activarSincronizacion() {
     if(usuarioActual.rol==='admin') onSnapshot(collection(db,"usuarios"),s=>{const l=document.getElementById("lista-usuarios-db");if(l){l.innerHTML="";s.forEach(d=>{const u=d.data();l.innerHTML+=`<div class="bg-white p-4 rounded-xl border flex justify-between items-center"><div><span class="font-bold">${d.id}</span> <span class="text-[10px] bg-slate-100 px-2 rounded uppercase">${u.rol}</span><br><span class="text-xs text-slate-400">${u.email||'-'}</span></div><div class="flex gap-2"><button onclick="prepararEdicionUsuario('${d.id}','${u.pass}','${u.rol}','${u.email||''}')" class="text-indigo-500"><i class="fas fa-pen"></i></button><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`;});}});
 }
 
-// --- MODAL GRUPO ADMIN ---
+// MODAL GRUPO
 window.abrirModalGrupo = (bKey) => {
     const m = document.getElementById("modal-grupo-admin"), c = document.getElementById("modal-grupo-contenido"), t = document.getElementById("modal-grupo-titulo");
     const items = pedidosRaw.filter(p => (p.batchId === bKey) || (p.timestamp.toString() === bKey));
     if(items.length===0) return;
-    t.innerHTML = `${items[0].usuarioId} | ${items[0].ubicacion} | ${items[0].fecha}`;
-    c.innerHTML = "";
+    t.innerHTML = `${items[0].usuarioId} | ${items[0].ubicacion} | ${items[0].fecha}`; c.innerHTML = "";
     items.forEach(p => {
         let act = `<span class="badge status-${p.estado}">${p.estado}</span>`;
         if(p.estado==='pendiente' && usuarioActual.rol!=='supervisor') {
@@ -245,7 +248,7 @@ window.abrirModalGrupo = (bKey) => {
     m.classList.remove("hidden");
 };
 
-// --- GESTIÓN INDIVIDUAL ---
+// GESTIÓN
 window.gestionarPedido = async (pid, accion, ins) => {
     const pRef = doc(db, "pedidos", pid), pSnap = await getDoc(pRef);
     if(!pSnap.exists()) return;
@@ -261,20 +264,21 @@ window.gestionarPedido = async (pid, accion, ins) => {
             await updateDoc(iRef, { cantidad: newStock });
             await updateDoc(pRef, { estado: "aprobado", cantidad: val });
             
-            // Email individual de aprobación (opcional, o podrías no enviar nada hasta procesar todo el grupo)
-            if(emailSolicitante) enviarNotificacionGrupo('aprobado_parcial', { usuario: pData.usuarioId, items: [{insumo:ins}], target_email: emailSolicitante });
-            
+            // Alerta Stock Bajo
             if(newStock <= (iSnap.data().stockMinimo||0)) enviarNotificacionGrupo('stock_bajo', { insumo: ins, actual: newStock, minimo: iSnap.data().stockMinimo });
             
-            // Cerrar modal si ya no hay pendientes
+            // Si es el último pendiente del grupo, cerramos modal
             const pendientes = pedidosRaw.filter(p => (p.batchId === pData.batchId) && p.estado === 'pendiente' && p.id !== pid);
             if(pendientes.length === 0) document.getElementById("modal-grupo-admin").classList.add("hidden");
-            else window.abrirModalGrupo(pData.batchId); // Refrescar modal
+            else window.abrirModalGrupo(pData.batchId); // Refrescar
+
+            // Notificación al usuario (Solo una vez si aprobamos por lote sería mejor, pero por ahora individual está bien para feedback inmediato)
+            if(emailSolicitante) enviarNotificacionGrupo('aprobado_parcial', { usuario: pData.usuarioId, items: [{insumo:ins, cantidad:val}], target_email: emailSolicitante });
 
         } else alert("Stock insuficiente");
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
-        window.abrirModalGrupo(pData.batchId); // Refrescar
+        window.abrirModalGrupo(pData.batchId);
     }
 };
 
@@ -282,7 +286,7 @@ window.confirmarRecibido = async (pid) => {
     if(confirm("¿Confirmar recepción?")) {
         const pRef=doc(db,"pedidos",pid), snap=await getDoc(pRef);
         await updateDoc(pRef, { estado: "recibido" });
-        if(snap.exists()) enviarNotificacionGrupo('recibido', {usuario:usuarioActual.id, insumo:snap.data().insumoNom, cantidad:snap.data().cantidad, sede:snap.data().ubicacion});
+        if(snap.exists()) enviarNotificacionGrupo('recibido', {usuario:usuarioActual.id, items:[{insumo:snap.data().insumoNom, cantidad:snap.data().cantidad}], sede:snap.data().ubicacion});
     }
 };
 
