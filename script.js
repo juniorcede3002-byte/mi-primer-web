@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, deleteDoc, updateDoc, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-// CONFIGURACIÓN (TUS LLAVES)
+// --- CONFIGURACIÓN ---
 const firebaseConfig = { apiKey: "AIzaSyA3cRmakg2dV2YRuNV1fY7LE87artsLmB8", authDomain: "mi-web-db.firebaseapp.com", projectId: "mi-web-db", storageBucket: "mi-web-db.appspot.com" };
 const CLOUD_NAME = 'df79cjklp'; const UPLOAD_PRESET = 'insumos'; 
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; const EMAIL_TEMPLATE_ID = 'template_mlcofoo'; const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
@@ -56,61 +56,53 @@ window.iniciarSesion = async () => {
 };
 window.cerrarSesion = () => { localStorage.removeItem("fcilog_session"); location.reload(); };
 
-// --- NAVEGACIÓN Y MENÚ MÓVIL (CORREGIDO) ---
+// UI & MENÚ (CORREGIDO)
 window.verPagina = (id) => {
     document.querySelectorAll(".view").forEach(v => {v.classList.add("hidden"); v.classList.remove("animate-fade-in")});
     const t = document.getElementById(`pag-${id}`);
     if(t){ t.classList.remove("hidden"); setTimeout(()=>t.classList.add("animate-fade-in"),10); }
-    if(window.innerWidth<768) window.toggleMenu(false); // Cerrar menú al navegar
+    if(window.innerWidth<768) window.toggleMenu(false);
 };
 
-// Esta función maneja la apertura/cierre del menú con clases CSS
 window.toggleMenu = (forceState) => {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebar-overlay");
-    
-    // Si forceState es null/undefined, invertimos el estado actual
-    const isClosed = sidebar.classList.contains("-translate-x-full");
+    const sb = document.getElementById("sidebar"), ov = document.getElementById("sidebar-overlay");
+    const isClosed = sb.classList.contains("-translate-x-full");
     const shouldOpen = forceState !== undefined ? forceState : isClosed;
-
-    if (shouldOpen) {
-        sidebar.classList.remove("-translate-x-full");
-        overlay.classList.remove("hidden");
-        // Asegurar Z-Index alto al abrir
-        overlay.style.zIndex = "90";
-        sidebar.style.zIndex = "100";
-    } else {
-        sidebar.classList.add("-translate-x-full");
-        overlay.classList.add("hidden");
-    }
+    if (shouldOpen) { sb.classList.remove("-translate-x-full"); ov.classList.remove("hidden"); ov.style.zIndex="90"; sb.style.zIndex="100"; } 
+    else { sb.classList.add("-translate-x-full"); ov.classList.add("hidden"); }
 };
 
 window.switchTab = (tab) => {
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
     document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
     const btnA = document.getElementById('tab-btn-activos'), btnH = document.getElementById('tab-btn-historial');
-    if(tab === 'activos') { btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm"; btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; } 
-    else { btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold transition-all bg-white text-indigo-600 shadow-sm"; btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; }
+    if(tab === 'activos') { 
+        btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold bg-white text-indigo-600 shadow-sm transition-all"; 
+        btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; 
+    } else { 
+        btnH.className = "flex-1 py-2 rounded-xl text-sm font-bold bg-white text-indigo-600 shadow-sm transition-all"; 
+        btnA.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 transition-all"; 
+    }
 };
 
 function configurarMenu() {
     const rol = usuarioActual.rol, menu = document.getElementById("menu-dinamico");
-    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Historial',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Solicitudes',i:'shipping-fast'} };
+    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Historial',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Pedidos',i:'shipping-fast'} };
     let r = [];
     if(rol==='admin') r=[i.st,i.sk,i.pd,i.pe,i.hs,i.us,i.mp]; else if(rol==='manager'||rol==='supervisor') r=[i.st,i.sk,i.pd,i.pe,i.hs,i.mp]; else r=[i.sk,i.pd,i.mp];
     menu.innerHTML = r.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
 }
 
-// NOTIFICACIONES
+// NOTIFICACIONES (AGRUPADAS)
 async function enviarNotificacionGrupo(tipo, datos) {
     let config = { to_email: datos.target_email || ADMIN_EMAIL, asunto: "", titulo_principal: "", mensaje_cuerpo: "", fecha: new Date().toLocaleString() };
     const lista = datos.items ? datos.items.map(i => `• ${i.insumo.toUpperCase()} (x${i.cantidad})`).join('\n') : "";
 
     switch (tipo) {
-        case 'nuevo_pedido': config.asunto = `📦 Nuevo Pedido de ${datos.usuario}`; config.titulo_principal = "🚀 Solicitud Recibida"; config.mensaje_cuerpo = `El usuario ${datos.usuario} ha solicitado:\n\n${lista}\n\n📍 Sede: ${datos.sede}`; break;
-        case 'aprobado_parcial': config.asunto = `✅ Actualización de Pedido`; config.titulo_principal = "Estado de Solicitud"; config.mensaje_cuerpo = `Hola ${datos.usuario},\n\nSe ha gestionado tu solicitud de:\n\n${lista}\n\nRevisa "Mis Pedidos" para ver el detalle.`; break;
-        case 'stock_bajo': config.asunto = `⚠️ ALERTA STOCK: ${datos.insumo}`; config.titulo_principal = "Stock Crítico"; config.mensaje_cuerpo = `El insumo ${datos.insumo} está bajo mínimos.\nActual: ${datos.actual}\nMínimo: ${datos.minimo}`; break;
-        case 'recibido': config.asunto = `🔵 Entrega Confirmada - ${datos.sede}`; config.titulo_principal = "Recepción Exitosa"; config.mensaje_cuerpo = `El usuario ${datos.usuario} confirmó la recepción de:\n\n${lista}`; break;
+        case 'nuevo_pedido': config.asunto = `📦 Pedido de ${datos.usuario}`; config.titulo_principal = "Solicitud Recibida"; config.mensaje_cuerpo = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`; break;
+        case 'aprobado_parcial': config.asunto = `✅ Pedido Aprobado`; config.titulo_principal = "Estado Actualizado"; config.mensaje_cuerpo = `Tu pedido de:\n\n${lista}\n\nHa sido APROBADO. Revisa "Mis Pedidos".`; break;
+        case 'stock_bajo': config.asunto = `⚠️ STOCK BAJO: ${datos.insumo}`; config.titulo_principal = "Alerta Inventario"; config.mensaje_cuerpo = `Insumo: ${datos.insumo}\nStock: ${datos.actual}\nMínimo: ${datos.minimo}`; break;
+        case 'recibido': config.asunto = `🔵 Recepción Confirmada`; config.titulo_principal = "Entrega Exitosa"; config.mensaje_cuerpo = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`; break;
     }
     try { await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, { asunto: config.asunto, titulo_principal: config.titulo_principal, mensaje_cuerpo: config.mensaje_cuerpo, to_email: config.to_email, fecha: config.fecha }); } catch (e) { console.error(e); }
 }
@@ -121,92 +113,171 @@ window.ajustarCantidad=(i,d)=>{const n=Math.max(0,(carritoGlobal[i]||0)+d); carr
 window.procesarSolicitudMultiple = async () => {
     const ubi = document.getElementById("sol-ubicacion").value, items = Object.entries(carritoGlobal).filter(([_, c]) => c > 0);
     if(!ubi || items.length === 0) return alert("Seleccione sede y productos.");
-    const batchId = Date.now().toString(); const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
+    const batchId = Date.now().toString(); 
+    const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
     await Promise.all(items.map(async ([ins, cant]) => {
         await addDoc(collection(db, "pedidos"), { usuarioId: usuarioActual.id, insumoNom: ins, cantidad: cant, ubicacion: ubi, estado: "pendiente", fecha: new Date().toLocaleString(), timestamp: Date.now(), batchId: batchId });
     }));
     enviarNotificacionGrupo('nuevo_pedido', { usuario: usuarioActual.id, sede: ubi, items: itemsData });
-    alert("✅ Solicitud enviada."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina('notificaciones');
+    alert("✅ Enviado."); carritoGlobal={}; document.getElementById("sol-ubicacion").value=""; activarSincronizacion(); window.verPagina('notificaciones');
 };
 
-// SINCRONIZACIÓN (Con lógica de Stock)
+// SINCRONIZACIÓN Y LÓGICA PRINCIPAL
 function activarSincronizacion() {
+    // 1. STOCK (CON DATALIST)
     onSnapshot(collection(db, "inventario"), snap => {
         const g=document.getElementById("lista-inventario"), c=document.getElementById("contenedor-lista-pedidos"), d=document.getElementById("lista-sugerencias");
         if(g)g.innerHTML=""; if(c)c.innerHTML=""; if(d)d.innerHTML="";
         let tr=0, ts=0, lb=[], dt=[];
         
         snap.forEach(ds=>{ const p=ds.data(), n=ds.id.toUpperCase(); tr++; ts+=p.cantidad; lb.push(n.slice(0,10)); dt.push(p.cantidad);
-            // Llenar el Datalist para el input de stock
-            if(d) d.innerHTML+=`<option value="${n}">`; 
-            
+            if(d)d.innerHTML+=`<option value="${n}">`;
             const adm=['admin','manager'].includes(usuarioActual.rol), acts=adm?`<div class="flex gap-2"><button onclick="prepararEdicionProducto('${ds.id}')" class="text-slate-300 hover:text-indigo-500"><i class="fas fa-cog"></i></button><button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button></div>`:'';
             const img=p.imagen?`<img src="${p.imagen}" class="w-12 h-12 object-cover rounded-lg border mb-2">`:`<div class="w-12 h-12 bg-slate-50 rounded-lg border flex items-center justify-center text-slate-300 mb-2"><i class="fas fa-image"></i></div>`;
-            const isLow = (p.stockMinimo && p.cantidad<=p.stockMinimo);
-            const border = isLow ? "border-2 border-red-500 bg-red-50" : "border border-slate-100 bg-white";
-            const price = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
-            const alertIco = isLow ? `<i class="fas fa-exclamation-circle text-red-500 animate-pulse ml-1"></i>` : '';
-
-            if(g)g.innerHTML+=`<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-sm truncate" title="${n}">${n} ${alertIco}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
+            const isLow=(p.stockMinimo&&p.cantidad<=p.stockMinimo), border=isLow?"border-2 border-red-500 bg-red-50":"border border-slate-100 bg-white", price=p.precio?`<span class="text-emerald-600 font-bold text-xs">$${p.precio}</span>`:'';
+            if(g)g.innerHTML+=`<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-xs truncate" title="${n}">${n}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
             if(c&&p.cantidad>0){ const inC=carritoGlobal[ds.id]||0, act=inC>0?"border-indigo-500 bg-indigo-50/50":"border-transparent bg-white"; c.innerHTML+=`<div id="row-${ds.id}" class="flex items-center justify-between p-3 rounded-xl border ${act} transition-all shadow-sm"><div class="flex items-center gap-3 overflow-hidden">${p.imagen?`<img src="${p.imagen}" class="w-8 h-8 rounded-md object-cover">`:''}<div class="truncate"><p class="font-bold text-xs uppercase text-slate-700 truncate">${n}</p><p class="text-[10px] text-slate-400">Disp: ${p.cantidad}</p></div></div><div class="flex items-center gap-2 bg-white rounded-lg p-1 border flex-shrink-0"><button onclick="ajustarCantidad('${ds.id}', -1)" class="w-7 h-7 rounded-md bg-slate-50 font-bold">-</button><span id="cant-${ds.id}" class="w-6 text-center font-bold text-indigo-600 text-sm">${inC}</span><button onclick="ajustarCantidad('${ds.id}', 1)" class="w-7 h-7 rounded-md bg-indigo-50 font-bold" ${inC>=p.cantidad?'disabled':''}>+</button></div></div>`; }
         });
         if(document.getElementById("metrica-stock")){ document.getElementById("metrica-total").innerText=tr; document.getElementById("metrica-stock").innerText=ts; renderChart('stockChart',lb,dt,'Stock','#6366f1',stockChart,c=>stockChart=c); }
     });
 
-    onSnapshot(collection(db,"pedidos"), s=>{
-        pedidosRaw = []; let grupos = {}, pendingCount = 0;
-        const lAdmin = document.getElementById("lista-pendientes-admin");
-        const lActive = document.getElementById("tab-content-activos");
-        const lHistory = document.getElementById("tab-content-historial");
-        const tHist = document.getElementById("tabla-historial-body");
-
-        if(lAdmin) lAdmin.innerHTML=""; if(lActive) lActive.innerHTML=""; if(lHistory) lHistory.innerHTML=""; if(tHist) tHist.innerHTML="";
-
-        s.forEach(ds => {
-            const p = ds.data(); p.id = ds.id; pedidosRaw.push(p);
-            const bKey = p.batchId || p.timestamp;
-            if(!grupos[bKey]) grupos[bKey] = { items:[], user:p.usuarioId, sede:p.ubicacion, date:p.fecha, ts:p.timestamp };
-            grupos[bKey].items.push(p);
-
-            if(p.estado==='pendiente') pendingCount++;
-            if(p.estado!=='pendiente'&&tHist) tHist.innerHTML+=`<tr class="hover:bg-slate-50"><td class="p-4 text-slate-500">${p.fecha.split(',')[0]}</td><td class="p-4 font-bold uppercase">${p.insumoNom}</td><td class="p-4">x${p.cantidad}</td><td class="p-4 text-indigo-600 font-bold">${p.ubicacion}</td><td class="p-4 text-slate-500">${p.usuarioId}</td><td class="p-4"><span class="badge status-${p.estado}">${p.estado}</span></td></tr>`;
-
-            if(p.usuarioId===usuarioActual.id) {
-                let btns = "";
-                if(p.estado==='aprobado') btns=`<div class="mt-2 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border text-slate-500 px-3 py-1 rounded text-xs">Reportar</button></div>`;
-                if(p.estado==='recibido' || p.estado==='devuelto') btns=`<div class="mt-2 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-500 text-xs hover:underline flex items-center gap-1"><i class="fas fa-undo"></i> Devolver / Reportar</button></div>`;
-                const card = `<div class="bg-white p-4 rounded-xl border shadow-sm"><div class="flex justify-between"><div><span class="badge status-${p.estado}">${p.estado}</span><h4 class="font-bold text-sm mt-1 uppercase">${p.insumoNom}</h4><p class="text-xs text-slate-400">x${p.cantidad} • ${p.ubicacion}</p></div></div>${btns}</div>`;
-                if(['pendiente','aprobado'].includes(p.estado)) { if(lActive) lActive.innerHTML+=card; } else { if(lHistory) lHistory.innerHTML+=card; }
-            }
-        });
-
-        if(lAdmin && ['admin','manager','supervisor'].includes(usuarioActual.rol)) {
-            Object.values(grupos).sort((a,b)=>b.ts-a.ts).forEach(g => {
-                const pendingItems = g.items.filter(i=>i.estado==='pendiente');
-                if(pendingItems.length > 0) {
-                    const itemsStr = pendingItems.map(i=>`<span class="bg-slate-100 px-2 py-1 rounded text-xs border">${i.insumoNom} (x${i.cantidad})</span>`).join('');
-                    lAdmin.innerHTML += `<div class="bg-white p-4 rounded-2xl border-l-4 border-l-amber-400 shadow-sm cursor-pointer hover:shadow-md transition" onclick="abrirModalGrupo('${g.items[0].batchId || g.ts}')"><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-800 text-sm">${g.user}</h4><span class="text-xs text-slate-400">${g.sede} • ${pendingItems.length} items</span></div><div class="flex flex-wrap gap-1">${itemsStr}</div><div class="mt-2 text-center text-xs text-indigo-500 font-bold">Ver Detalles <i class="fas fa-chevron-right"></i></div></div>`;
-                }
-            });
-        }
-        if(document.getElementById("metrica-pedidos")) document.getElementById("metrica-pedidos").innerText=pendingCount;
-    });
-
-    onSnapshot(collection(db,"entradas_stock"),s=>{const t=document.getElementById("tabla-entradas-body");if(t){t.innerHTML="";let d=[];s.forEach(x=>d.push(x.data()));d.sort((a,b)=>b.timestamp-a.timestamp);d.forEach(e=>{t.innerHTML+=`<tr class="hover:bg-emerald-50/30"><td class="p-4 text-xs">${e.fecha}</td><td class="p-4 font-bold uppercase text-emerald-900">${e.insumo}</td><td class="p-4 font-black text-emerald-600">+${e.cantidad}</td><td class="p-4 text-xs uppercase">${e.usuario}</td></tr>`;});}});
-    if(usuarioActual.rol==='admin') onSnapshot(collection(db,"usuarios"),s=>{const l=document.getElementById("lista-usuarios-db");if(l){l.innerHTML="";s.forEach(d=>{const u=d.data();l.innerHTML+=`<div class="bg-white p-4 rounded-xl border flex justify-between items-center"><div><span class="font-bold uppercase">${d.id}</span> <span class="text-[10px] bg-slate-100 px-2 rounded uppercase">${u.rol}</span><br><span class="text-xs text-slate-400">${u.email||'-'}</span></div><div class="flex gap-2"><button onclick="prepararEdicionUsuario('${d.id}','${u.pass}','${u.rol}','${u.email||''}')" class="text-indigo-500"><i class="fas fa-pen"></i></button><button onclick="eliminarDato('usuarios','${d.id}')" class="text-red-400"><i class="fas fa-trash"></i></button></div></div>`;});}});
+    // 2. PEDIDOS Y ENTRADAS (HISTORIAL UNIFICADO)
+    Promise.all([
+        onSnapshot(collection(db,"pedidos"), s => actualizarDatos(s, 'pedidos')),
+        onSnapshot(collection(db,"entradas_stock"), s => actualizarDatos(s, 'entradas'))
+    ]);
 }
 
+// Variables caché para unificar historial
+let cachePedidos = [], cacheEntradas = [];
+
+function actualizarDatos(snapshot, tipo) {
+    if(tipo === 'pedidos') {
+        cachePedidos = [];
+        snapshot.forEach(doc => { const d = doc.data(); d.id = doc.id; cachePedidos.push(d); });
+    } else {
+        cacheEntradas = [];
+        snapshot.forEach(doc => { const d = doc.data(); d.id = doc.id; cacheEntradas.push(d); });
+    }
+    renderizarTodo();
+}
+
+function renderizarTodo() {
+    pedidosRaw = cachePedidos;
+    let grupos = {}, pendingCount = 0;
+    
+    // UI Elements
+    const lAdmin = document.getElementById("lista-pendientes-admin");
+    const lActive = document.getElementById("tab-content-activos");
+    const lHistory = document.getElementById("tab-content-historial");
+    const tUnificada = document.getElementById("tabla-movimientos-unificados");
+
+    if(lAdmin) lAdmin.innerHTML=""; if(lActive) lActive.innerHTML=""; if(lHistory) lHistory.innerHTML=""; if(tUnificada) tUnificada.innerHTML="";
+
+    // --- PROCESAR PEDIDOS ---
+    pedidosRaw.forEach(p => {
+        // Agrupar
+        const bKey = p.batchId || p.timestamp;
+        if(!grupos[bKey]) grupos[bKey] = { items:[], user:p.usuarioId, sede:p.ubicacion, date:p.fecha, ts:p.timestamp };
+        grupos[bKey].items.push(p);
+
+        if(p.estado==='pendiente') pendingCount++;
+
+        // Vista Usuario (Tabs)
+        if(p.usuarioId === usuarioActual.id) {
+            let btns = "";
+            // En Curso (Pendiente por Recibir)
+            if(p.estado==='aprobado') btns=`<div class="mt-2 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1 rounded text-xs shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border text-red-500 border-red-200 px-3 py-1 rounded text-xs">Reportar</button></div>`;
+            // Historial (Permitir Devolver)
+            if(p.estado==='recibido' || p.estado==='devuelto') btns=`<div class="mt-2 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-600 text-xs hover:underline flex items-center gap-1"><i class="fas fa-undo"></i> Devolver / Reportar</button></div>`;
+            
+            const card = `<div class="bg-white p-4 rounded-xl border shadow-sm"><div class="flex justify-between"><div><span class="badge status-${p.estado}">${p.estado}</span><h4 class="font-bold text-sm mt-1 uppercase">${p.insumoNom}</h4><p class="text-xs text-slate-400">x${p.cantidad} • ${p.ubicacion}</p></div></div>${btns}</div>`;
+            
+            if(['pendiente','aprobado'].includes(p.estado)) { if(lActive) lActive.innerHTML+=card; } 
+            else { if(lHistory) lHistory.innerHTML+=card; }
+        }
+    });
+
+    // --- RENDER ADMIN (Agrupado) ---
+    if(lAdmin && ['admin','manager','supervisor'].includes(usuarioActual.rol)) {
+        Object.values(grupos).sort((a,b)=>b.ts-a.ts).forEach(g => {
+            const pendingItems = g.items.filter(i=>i.estado==='pendiente');
+            if(pendingItems.length > 0) {
+                const itemsStr = pendingItems.map(i=>`<span class="bg-slate-100 px-2 py-1 rounded text-xs border">${i.insumoNom} (x${i.cantidad})</span>`).join('');
+                lAdmin.innerHTML += `<div class="bg-white p-4 rounded-2xl border-l-4 border-l-amber-400 shadow-sm cursor-pointer hover:shadow-md transition" onclick="abrirModalGrupo('${g.items[0].batchId || g.ts}')"><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-slate-800 text-sm">${g.user}</h4><span class="text-xs text-slate-400">${g.sede} • ${pendingItems.length} items</span></div><div class="flex flex-wrap gap-1">${itemsStr}</div><div class="mt-2 text-center text-xs text-indigo-500 font-bold">Ver Detalles <i class="fas fa-chevron-right"></i></div></div>`;
+            }
+        });
+    }
+    if(document.getElementById("metrica-pedidos")) document.getElementById("metrica-pedidos").innerText=pendingCount;
+
+    // --- TABLA UNIFICADA (ENTRADAS + SALIDAS) ---
+    if(tUnificada) {
+        // 1. Formatear Entradas
+        const entradasFmt = cacheEntradas.map(e => ({
+            fecha: e.fecha, ts: e.timestamp, tipo: 'ENTRADA', insumo: e.insumo,
+            cantidad: e.cantidad, detalle: e.usuario, estado: 'completado'
+        }));
+        // 2. Formatear Salidas (Pedidos)
+        const salidasFmt = cachePedidos.map(p => ({
+            fecha: p.fecha, ts: p.timestamp, tipo: 'SALIDA', insumo: p.insumoNom,
+            cantidad: p.cantidad, detalle: `${p.usuarioId} (${p.ubicacion})`, estado: p.estado
+        }));
+        
+        // 3. Unir y Ordenar
+        const historialGlobal = [...entradasFmt, ...salidasFmt].sort((a,b) => b.ts - a.ts);
+
+        // 4. Renderizar
+        historialGlobal.forEach(h => {
+            const colorTipo = h.tipo === 'ENTRADA' ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50';
+            const icon = h.tipo === 'ENTRADA' ? '<i class="fas fa-arrow-down"></i>' : '<i class="fas fa-arrow-up"></i>';
+            tUnificada.innerHTML += `
+            <tr class="hover:bg-slate-50 border-b border-slate-50 last:border-0">
+                <td class="p-3 text-slate-400 text-[10px] font-mono">${h.fecha.split(',')[0]}</td>
+                <td class="p-3"><span class="px-2 py-1 rounded text-[9px] font-black ${colorTipo}">${icon} ${h.tipo}</span></td>
+                <td class="p-3 font-bold text-slate-700 uppercase text-xs">${h.insumo}</td>
+                <td class="p-3 text-sm font-bold text-slate-800">${h.cantidad}</td>
+                <td class="p-3 text-xs text-slate-500 uppercase">${h.detalle}</td>
+                <td class="p-3"><span class="badge status-${h.estado}">${h.estado}</span></td>
+            </tr>`;
+        });
+    }
+}
+
+// LOGICA ENTRADA RÁPIDA (HÍBRIDA)
+window.agregarProductoRápido = async () => {
+    const nombre = document.getElementById("nombre-prod").value.trim().toUpperCase();
+    const cantidad = parseInt(document.getElementById("cantidad-prod").value);
+
+    if (nombre && cantidad > 0) {
+        const id = nombre.toLowerCase();
+        const ref = doc(db, "inventario", id);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+            await updateDoc(ref, { cantidad: snap.data().cantidad + cantidad });
+            alert(`✅ Stock actualizado: ${nombre}`);
+        } else {
+            if(confirm(`"${nombre}" no existe. ¿Crear nuevo?`)) {
+                await setDoc(ref, { cantidad: cantidad });
+                alert(`✅ Producto creado: ${nombre}`);
+            } else return;
+        }
+        
+        await addDoc(collection(db, "entradas_stock"), { insumo: nombre, cantidad: cantidad, usuario: usuarioActual.id, fecha: new Date().toLocaleString(), timestamp: Date.now() });
+        cerrarModalInsumo(); document.getElementById("nombre-prod").value=""; document.getElementById("cantidad-prod").value="";
+    } else alert("Datos inválidos.");
+};
+
+// ... RESTO DE FUNCIONES (Gestión, Modales, Excel - Mantenidos igual) ...
 window.abrirModalGrupo = (bKey) => {
     const m = document.getElementById("modal-grupo-admin"), c = document.getElementById("modal-grupo-contenido"), t = document.getElementById("modal-grupo-titulo");
     const items = pedidosRaw.filter(p => (p.batchId === bKey) || (p.timestamp.toString() === bKey));
     if(items.length===0) return;
-    t.innerHTML = `${items[0].usuarioId} | ${items[0].ubicacion} | ${items[0].fecha}`; c.innerHTML = "";
+    t.innerHTML = `${items[0].usuarioId} | ${items[0].ubicacion}`; c.innerHTML = "";
     items.forEach(p => {
         let act = `<span class="badge status-${p.estado}">${p.estado}</span>`;
-        if(p.estado==='pendiente' && usuarioActual.rol!=='supervisor') {
-            act = `<div class="flex gap-2 items-center"><input type="number" id="qty-${p.id}" value="${p.cantidad}" class="w-12 border rounded text-center p-1"><button onclick="gestionarPedido('${p.id}','aprobar','${p.insumoNom}')" class="text-green-600 bg-green-50 p-2 rounded"><i class="fas fa-check"></i></button><button onclick="gestionarPedido('${p.id}','rechazar')" class="text-red-600 bg-red-50 p-2 rounded"><i class="fas fa-times"></i></button></div>`;
-        }
-        c.innerHTML += `<div class="flex justify-between items-center p-3 border-b last:border-0 hover:bg-slate-50"><div><b class="uppercase text-sm">${p.insumoNom}</b><br><span class="text-xs text-slate-400">Solicitado: ${p.cantidad}</span></div>${act}</div>`;
+        if(p.estado==='pendiente' && usuarioActual.rol!=='supervisor') act = `<div class="flex gap-2 items-center"><input type="number" id="qty-${p.id}" value="${p.cantidad}" class="w-12 border rounded text-center p-1"><button onclick="gestionarPedido('${p.id}','aprobar','${p.insumoNom}')" class="text-green-600 bg-green-50 p-2 rounded"><i class="fas fa-check"></i></button><button onclick="gestionarPedido('${p.id}','rechazar')" class="text-red-600 bg-red-50 p-2 rounded"><i class="fas fa-times"></i></button></div>`;
+        c.innerHTML += `<div class="flex justify-between items-center p-3 border-b hover:bg-slate-50"><div><b class="uppercase text-sm">${p.insumoNom}</b><br><span class="text-xs text-slate-400">Solicitado: ${p.cantidad}</span></div>${act}</div>`;
     });
     m.classList.remove("hidden");
 };
@@ -219,21 +290,13 @@ window.gestionarPedido = async (pid, accion, ins) => {
 
     if(accion === 'aprobar') {
         const inp = document.getElementById(`qty-${pid}`), val = inp?parseInt(inp.value):pData.cantidad;
-        if(val<=0) return alert("Cantidad inválida");
         const iRef = doc(db, "inventario", ins.toLowerCase()), iSnap = await getDoc(iRef);
         if(iSnap.exists() && iSnap.data().cantidad >= val) {
-            const newStock = iSnap.data().cantidad - val;
-            await updateDoc(iRef, { cantidad: newStock });
+            await updateDoc(iRef, { cantidad: iSnap.data().cantidad - val });
             await updateDoc(pRef, { estado: "aprobado", cantidad: val });
-            
-            if(newStock <= (iSnap.data().stockMinimo||0)) enviarNotificacionGrupo('stock_bajo', { insumo: ins, actual: newStock, minimo: iSnap.data().stockMinimo });
-            
-            const pendientes = pedidosRaw.filter(p => (p.batchId === pData.batchId) && p.estado === 'pendiente' && p.id !== pid);
-            if(pendientes.length === 0) document.getElementById("modal-grupo-admin").classList.add("hidden");
-            else window.abrirModalGrupo(pData.batchId); 
-
             if(emailSolicitante) enviarNotificacionGrupo('aprobado_parcial', { usuario: pData.usuarioId, items: [{insumo:ins, cantidad:val}], target_email: emailSolicitante });
-
+            if ((iSnap.data().cantidad - val) <= (iSnap.data().stockMinimo||0)) enviarNotificacionGrupo('stock_bajo', { insumo: ins, actual: iSnap.data().cantidad - val, minimo: iSnap.data().stockMinimo });
+            window.abrirModalGrupo(pData.batchId);
         } else alert("Stock insuficiente");
     } else {
         await updateDoc(pRef, { estado: "rechazado" });
@@ -242,49 +305,10 @@ window.gestionarPedido = async (pid, accion, ins) => {
 };
 
 window.confirmarRecibido = async (pid) => { 
-    if(confirm("¿Confirmar recepción?")) {
+    if(confirm("¿Confirmar?")) {
         const pRef=doc(db,"pedidos",pid), snap=await getDoc(pRef);
         await updateDoc(pRef, { estado: "recibido" });
         if(snap.exists()) enviarNotificacionGrupo('recibido', {usuario:usuarioActual.id, items:[{insumo:snap.data().insumoNom, cantidad:snap.data().cantidad}], sede:snap.data().ubicacion});
-    }
-};
-
-// --- LOGICA ENTRADA RAPIDA (SIN DUPLICIDAD) ---
-window.agregarProductoRápido = async () => {
-    // Tomamos el valor, limpiamos espacios y mayúsculas
-    const nombre = document.getElementById("nombre-prod").value.trim().toUpperCase();
-    const cantidad = parseInt(document.getElementById("cantidad-prod").value);
-
-    if (nombre && cantidad > 0) {
-        // ID en minúsculas para consistencia en la BD
-        const id = nombre.toLowerCase();
-        const ref = doc(db, "inventario", id);
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) {
-            // Si ya existe, SUMAMOS
-            await updateDoc(ref, { cantidad: snap.data().cantidad + cantidad });
-            alert(`✅ Se agregaron ${cantidad} unidades a ${nombre}`);
-        } else {
-            // Si no existe, CREAMOS
-            if(confirm(`El producto "${nombre}" no existe. ¿Deseas crearlo nuevo?`)) {
-                await setDoc(ref, { cantidad: cantidad });
-                alert(`✅ Producto ${nombre} creado con ${cantidad} unidades.`);
-            } else {
-                return; // Cancelar si el usuario no quiere crear
-            }
-        }
-        
-        await addDoc(collection(db, "entradas_stock"), { 
-            insumo: nombre, cantidad: cantidad, usuario: usuarioActual.id, 
-            fecha: new Date().toLocaleString(), timestamp: Date.now() 
-        });
-        
-        cerrarModalInsumo(); 
-        document.getElementById("nombre-prod").value=""; 
-        document.getElementById("cantidad-prod").value="";
-    } else {
-        alert("Ingrese un nombre y una cantidad válida.");
     }
 };
 
