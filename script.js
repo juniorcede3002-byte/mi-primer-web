@@ -13,7 +13,7 @@ const firebaseConfig = {
 const CLOUD_NAME = 'df79cjklp'; 
 const UPLOAD_PRESET = 'insumos'; 
 
-// EMAILJS
+// EMAILJS (Datos Verificados)
 const EMAIL_SERVICE_ID = 'service_a7yozqh'; 
 const EMAIL_TEMPLATE_ID = 'template_zglatmb'; 
 const EMAIL_PUBLIC_KEY = '2jVnfkJKKG0bpKN-U'; 
@@ -42,9 +42,11 @@ emailjs.init(EMAIL_PUBLIC_KEY);
 window.addEventListener('DOMContentLoaded', () => {
     const sesion = localStorage.getItem("fcilog_session");
     if (sesion) cargarSesion(JSON.parse(sesion));
+    // Iniciar widget de Cloudinary una sola vez
     setupCloudinaryWidget();
 });
 
+// FUNCIÓN CLOUDINARY UNIFICADA
 function setupCloudinaryWidget() {
     if (typeof cloudinary !== "undefined") {
         cloudinaryWidget = cloudinary.createUploadWidget({
@@ -67,10 +69,12 @@ function setupCloudinaryWidget() {
             }
         });
 
+        // Vincular botón si existe en el DOM
         const btnUpload = document.getElementById("upload_widget");
         if(btnUpload) {
             const newBtn = btnUpload.cloneNode(true);
             btnUpload.parentNode.replaceChild(newBtn, btnUpload);
+            
             newBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 if(cloudinaryWidget) cloudinaryWidget.open();
@@ -112,106 +116,243 @@ function cargarSesion(datos) {
 window.iniciarSesion = async () => {
     const user = document.getElementById("login-user").value.trim().toLowerCase();
     const pass = document.getElementById("login-pass").value.trim();
+    
     if(!user || !pass) return alert("Ingrese usuario y contraseña.");
-    if (user === "admin" && pass === "1130") { cargarSesion({ id: "admin", rol: "admin" }); return; }
+    
+    if (user === "admin" && pass === "1130") { 
+        cargarSesion({ id: "admin", rol: "admin" }); 
+        return; 
+    }
+    
     try {
         const snap = await getDoc(doc(db, "usuarios", user));
-        if (snap.exists() && snap.data().pass === pass) cargarSesion({ id: user, ...snap.data() });
-        else alert("Credenciales incorrectas.");
-    } catch (e) { alert("Error de conexión."); }
+        if (snap.exists() && snap.data().pass === pass) {
+            cargarSesion({ id: user, ...snap.data() });
+        } else {
+            alert("Credenciales incorrectas.");
+        }
+    } catch (e) { 
+        console.error("Error Login:", e);
+        alert("Error de conexión."); 
+    }
 };
 
-window.cerrarSesion = () => { localStorage.removeItem("fcilog_session"); location.reload(); };
+window.cerrarSesion = () => { 
+    localStorage.removeItem("fcilog_session"); 
+    location.reload(); 
+};
 
 // --- 4. UI Y NAVEGACIÓN ---
 window.verPagina = (id) => {
-    document.querySelectorAll(".view").forEach(v => { v.classList.add("hidden"); v.classList.remove("animate-fade-in"); });
+    document.querySelectorAll(".view").forEach(v => {
+        v.classList.add("hidden"); 
+        v.classList.remove("animate-fade-in");
+    });
+    
     const target = document.getElementById(`pag-${id}`);
-    if(target) { target.classList.remove("hidden"); setTimeout(() => target.classList.add("animate-fade-in"), 10); }
+    if(target) { 
+        target.classList.remove("hidden"); 
+        setTimeout(() => target.classList.add("animate-fade-in"), 10); 
+    }
+    
     if(window.innerWidth < 768) window.toggleMenu(false);
 };
 
 window.toggleMenu = (forceState) => {
-    const sb = document.getElementById("sidebar"), ov = document.getElementById("sidebar-overlay");
+    const sb = document.getElementById("sidebar");
+    const ov = document.getElementById("sidebar-overlay");
     const isClosed = sb.classList.contains("-translate-x-full");
     const shouldOpen = forceState !== undefined ? forceState : isClosed;
-    if (shouldOpen) { sb.classList.remove("-translate-x-full"); ov.classList.remove("hidden"); sb.style.zIndex = "100"; ov.style.zIndex = "90"; } 
-    else { sb.classList.add("-translate-x-full"); ov.classList.add("hidden"); }
+
+    if (shouldOpen) {
+        sb.classList.remove("-translate-x-full");
+        ov.classList.remove("hidden");
+        sb.style.zIndex = "100";
+        ov.style.zIndex = "90";
+    } else {
+        sb.classList.add("-translate-x-full");
+        ov.classList.add("hidden");
+    }
 };
 
 window.switchTab = (tab) => {
     document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
     document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
-    const btnA = document.getElementById('tab-btn-activos'), btnH = document.getElementById('tab-btn-historial');
+    
+    const btnA = document.getElementById('tab-btn-activos');
+    const btnH = document.getElementById('tab-btn-historial');
     const activeClass = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white text-indigo-600 shadow-sm transition-all"; 
     const inactiveClass = "flex-1 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-500 hover:text-slate-700 transition-all";
-    if(tab === 'activos') { btnA.className = activeClass; btnH.className = inactiveClass; } 
-    else { btnH.className = activeClass; btnA.className = inactiveClass; }
+
+    if(tab === 'activos') { 
+        btnA.className = activeClass; 
+        btnH.className = inactiveClass; 
+    } else { 
+        btnH.className = activeClass; 
+        btnA.className = inactiveClass; 
+    }
 };
 
 function configurarMenu() {
-    const rol = usuarioActual.rol, menu = document.getElementById("menu-dinamico");
-    const i = { st:{id:'stats',n:'Dashboard',i:'chart-pie'}, sk:{id:'stock',n:'Stock',i:'boxes'}, pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, hs:{id:'historial',n:'Movimientos',i:'history'}, us:{id:'usuarios',n:'Accesos',i:'users-cog'}, mp:{id:'notificaciones',n:'Mis Solicitudes',i:'shipping-fast'} };
+    const rol = usuarioActual.rol;
+    const menu = document.getElementById("menu-dinamico");
+    const items = { 
+        st:{id:'stats',n:'Dashboard',i:'chart-pie'}, 
+        sk:{id:'stock',n:'Stock',i:'boxes'}, 
+        pd:{id:'solicitar',n:'Realizar Pedido',i:'cart-plus'}, 
+        pe:{id:'solicitudes',n:'Aprobaciones',i:'clipboard-check'}, 
+        hs:{id:'historial',n:'Movimientos',i:'history'}, 
+        us:{id:'usuarios',n:'Accesos',i:'users-cog'}, 
+        mp:{id:'notificaciones',n:'Mis Solicitudes',i:'shipping-fast'} 
+    };
+    
     let rutas = [];
-    if(rol==='admin') rutas=[items.st, items.sk, items.pd, items.pe, items.hs, items.us, items.mp]; else if(rol==='manager'||rol==='supervisor') rutas=[items.st, items.sk, items.pd, items.pe, items.hs, items.mp]; else rutas=[items.sk, items.pd, items.mp];
-    menu.innerHTML = rutas.map(x => `<button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group"><div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}</button>`).join('');
+    if(rol==='admin') rutas=[items.st, items.sk, items.pd, items.pe, items.hs, items.us, items.mp]; 
+    else if(rol==='manager'||rol==='supervisor') rutas=[items.st, items.sk, items.pd, items.pe, items.hs, items.mp]; 
+    else rutas=[items.sk, items.pd, items.mp];
+    
+    menu.innerHTML = rutas.map(x => `
+        <button onclick="verPagina('${x.id}')" class="w-full flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all font-bold text-sm group">
+            <div class="w-8 h-8 rounded-lg bg-slate-50 group-hover:bg-white border border-slate-100 flex items-center justify-center transition-colors"><i class="fas fa-${x.i}"></i></div>${x.n}
+        </button>`).join('');
 }
 
 // --- 5. NOTIFICACIONES ---
 async function enviarNotificacionGrupo(tipo, datos) {
-    let config = { to_email: datos.target_email || ADMIN_EMAIL, asunto: "", titulo: "", mensaje: "", fecha: new Date().toLocaleString() };
+    let config = { 
+        to_email: datos.target_email || ADMIN_EMAIL, 
+        asunto: "", titulo: "", mensaje: "", fecha: new Date().toLocaleString() 
+    };
+    
     const lista = datos.items ? datos.items.map(i => `• ${i.insumo.toUpperCase()} (x${i.cantidad})`).join('\n') : "";
+
     switch (tipo) {
-        case 'nuevo_pedido': config.asunto = `📦 Pedido de ${datos.usuario}`; config.titulo = "Nueva Solicitud"; config.mensaje = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`; break;
-        case 'aprobado_parcial': config.asunto = `✅ Pedido Aprobado`; config.titulo = "Estado Actualizado"; config.mensaje = `Tu pedido ha sido APROBADO:\n\n${lista}`; break;
-        case 'stock_bajo': config.asunto = `⚠️ STOCK BAJO: ${datos.insumo}`; config.titulo = "Alerta Inventario"; config.mensaje = `Producto: ${datos.insumo}\nStock Actual: ${datos.actual}\nMínimo: ${datos.minimo}`; break;
-        case 'recibido': config.asunto = `🔵 Recepción Confirmada`; config.titulo = "Entrega Exitosa"; config.mensaje = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`; break;
+        case 'nuevo_pedido':
+            config.asunto = `📦 Pedido de ${datos.usuario}`;
+            config.titulo = "Nueva Solicitud";
+            config.mensaje = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`;
+            break;
+        case 'aprobado_parcial':
+            config.asunto = `✅ Pedido Aprobado`;
+            config.titulo = "Estado Actualizado";
+            config.mensaje = `Tu pedido ha sido APROBADO:\n\n${lista}`;
+            break;
+        case 'stock_bajo':
+            config.asunto = `⚠️ STOCK BAJO: ${datos.insumo}`;
+            config.titulo = "Alerta Inventario";
+            config.mensaje = `Producto: ${datos.insumo}\nStock Actual: ${datos.actual}\nMínimo: ${datos.minimo}`;
+            break;
+        case 'recibido':
+            config.asunto = `🔵 Recepción Confirmada`;
+            config.titulo = "Entrega Exitosa";
+            config.mensaje = `Usuario: ${datos.usuario}\nSede: ${datos.sede}\n\n${lista}`;
+            break;
     }
-    try { await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, { asunto: config.asunto, titulo_principal: config.titulo, mensaje_cuerpo: config.mensaje, to_email: config.to_email, fecha: config.fecha }); } catch (e) { console.error("Error EmailJS:", e); }
+
+    try { 
+        await emailjs.send(EMAIL_SERVICE_ID, EMAIL_TEMPLATE_ID, { 
+            asunto: config.asunto, 
+            titulo_principal: config.titulo, 
+            mensaje_cuerpo: config.mensaje, 
+            to_email: config.to_email, 
+            fecha: config.fecha 
+        }); 
+    } catch (e) { 
+        console.error("Error EmailJS:", e);
+    }
 }
 
 // --- 6. SINCRONIZACIÓN DATOS ---
 function activarSincronizacion() {
+    
+    // A) INVENTARIO
     onSnapshot(collection(db, "inventario"), snap => {
-        const g=document.getElementById("lista-inventario"), c=document.getElementById("contenedor-lista-pedidos"), d=document.getElementById("lista-sugerencias");
-        if(g)g.innerHTML=""; if(c)c.innerHTML=""; if(d)d.innerHTML="";
+        const g = document.getElementById("lista-inventario");
+        const c = document.getElementById("contenedor-lista-pedidos");
+        const d = document.getElementById("lista-sugerencias");
+        
+        if(g) g.innerHTML=""; 
+        if(c) c.innerHTML=""; 
+        if(d) d.innerHTML="";
+        
         let tr=0, ts=0, lb=[], dt=[];
-        snap.forEach(ds=>{ 
-            const p = ds.data(), nombre = ds.id.toUpperCase(); tr++; ts+=p.cantidad; lb.push(nombre.substring(0, 10)); dt.push(p.cantidad);
-            if(d) dataList.innerHTML += `<option value="${nombre}">`;
-            const adm=['admin','manager'].includes(usuarioActual.rol), acts=adm?`<div class="flex gap-2"><button onclick="prepararEdicionProducto('${ds.id}')" class="text-slate-300 hover:text-indigo-500"><i class="fas fa-cog"></i></button><button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button></div>`:'';
+
+        snap.forEach(ds => {
+            const p = ds.data(); 
+            const nombre = ds.id.toUpperCase();
+            
+            tr++; 
+            ts += p.cantidad;
+            lb.push(nombre.substring(0, 10));
+            dt.push(p.cantidad);
+
+            if(d) d.innerHTML += `<option value="${nombre}">`;
+
+            // GRID
+            const isAdmin = ['admin','manager'].includes(usuarioActual.rol);
+            const controls = isAdmin ? `<div class="flex gap-2"><button onclick="prepararEdicionProducto('${ds.id}')" class="text-slate-300 hover:text-indigo-500"><i class="fas fa-cog"></i></button><button onclick="eliminarDato('inventario','${ds.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button></div>` : '';
             const img = p.imagen ? `<img src="${p.imagen}" class="w-12 h-12 object-cover rounded-lg border mb-2">` : `<div class="w-12 h-12 bg-slate-50 rounded-lg border flex items-center justify-center text-slate-300 mb-2"><i class="fas fa-image"></i></div>`;
-            const isLow = (p.stockMinimo && p.cantidad <= p.stockMinimo), border = isLow ? "border-2 border-red-500 bg-red-50" : "border border-slate-100 bg-white", price = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
-            if(g) g.innerHTML += `<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${acts}</div><h4 class="font-bold text-slate-700 text-xs truncate" title="${nombre}">${nombre} ${isLow?'<i class="fas fa-exclamation-circle text-red-500 animate-pulse"></i>':''}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
-            if(c&&p.cantidad>0){ const inC=carritoGlobal[ds.id]||0, act=inC>0?"border-indigo-500 bg-indigo-50/50":"border-transparent bg-white"; c.innerHTML += `<div id="row-${ds.id}" class="flex items-center justify-between p-3 rounded-xl border ${act} transition-all shadow-sm"><div class="flex items-center gap-3 overflow-hidden">${p.imagen?`<img src="${p.imagen}" class="w-8 h-8 rounded-md object-cover">`:''}<div class="truncate"><p class="font-bold text-xs uppercase text-slate-700 truncate">${nombre}</p><p class="text-[10px] text-slate-400">Disp: ${p.cantidad}</p></div></div><div class="flex items-center gap-2 bg-white rounded-lg p-1 border flex-shrink-0"><button onclick="ajustarCantidad('${ds.id}', -1)" class="w-7 h-7 rounded-md bg-slate-50 font-bold">-</button><span id="cant-${ds.id}" class="w-6 text-center font-bold text-indigo-600 text-sm">${inC}</span><button onclick="ajustarCantidad('${ds.id}', 1)" class="w-7 h-7 rounded-md bg-indigo-50 font-bold" ${inC>=p.cantidad?'disabled':''}>+</button></div></div>`; }
-        });
-        if(document.getElementById("metrica-total")) document.getElementById("metrica-total").innerText = tr;
-        if(document.getElementById("metrica-stock")) document.getElementById("metrica-stock").innerText = ts;
-        renderChart('stockChart', lb, dt, 'Stock', '#6366f1', stockChart, c => stockChart = c);
-    });
+            const isLow = (p.stockMinimo && p.cantidad <= p.stockMinimo);
+            const border = isLow ? "border-2 border-red-500 bg-red-50" : "border border-slate-100 bg-white";
+            const price = p.precio ? `<span class="text-xs font-bold text-emerald-600">$${p.precio}</span>` : '';
+            
+            if(g) {
+                g.innerHTML += `<div class="${border} p-4 rounded-2xl shadow-sm hover:shadow-md transition flex flex-col"><div class="flex justify-between items-start">${img}${controls}</div><h4 class="font-bold text-slate-700 text-xs truncate" title="${nombre}">${nombre} ${isLow?'<i class="fas fa-exclamation-circle text-red-500 animate-pulse"></i>':''}</h4><div class="flex justify-between items-end mt-1"><p class="text-2xl font-black text-slate-800">${p.cantidad}</p>${price}</div></div>`;
+            }
 
-    onSnapshot(collection(db,"pedidos"), s => {
-        pedidosRaw = []; cachePedidos = []; let grupos = {}, pendingCount = 0, sedesCount = {};
-        const lAdmin = document.getElementById("lista-pendientes-admin"), lActive = document.getElementById("tab-content-activos"), lHistory = document.getElementById("tab-content-historial");
-        if(lAdmin) lAdmin.innerHTML=""; if(lActive) lActive.innerHTML=""; if(lHistory) lHistory.innerHTML="";
-
-        s.forEach(ds => {
-            const p = ds.data(); p.id = ds.id; pedidosRaw.push(p); cachePedidos.push(p);
-            if(p.estado !== 'rechazado') sedesCount[p.ubicacion] = (sedesCount[p.ubicacion] || 0) + p.cantidad;
-            const bKey = p.batchId || p.timestamp;
-            if(!grupos[bKey]) grupos[bKey] = { items:[], user:p.usuarioId, sede:p.ubicacion, date:p.fecha, ts:p.timestamp };
-            grupos[bKey].items.push(p);
-            if(p.estado === 'pendiente') pendingCount++;
-
-            if(p.usuarioId === usuarioActual.id) {
-                let btns = "";
-                if(p.estado === 'aprobado') btns = `<div class="mt-3 pt-3 border-t border-slate-50 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border border-red-200 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold">Reportar</button></div>`;
-                else if(p.estado === 'recibido' || p.estado === 'devuelto') btns = `<div class="mt-3 pt-3 border-t border-slate-50 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-500 text-xs font-bold hover:underline flex items-center gap-1"><i class="fas fa-undo"></i> Devolver / Reportar</button></div>`;
-                const cardHtml = `<div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition"><div class="flex justify-between items-start"><div><span class="badge status-${p.estado}">${p.estado}</span><h4 class="font-black text-slate-700 uppercase text-sm mt-2">${p.insumoNom}</h4><p class="text-xs text-slate-400 font-mono mt-1">x${p.cantidad} • ${p.ubicacion}</p></div></div>${btns}</div>`;
-                if(['pendiente', 'aprobado'].includes(p.estado)) { if(lActive) lActive.innerHTML += cardHtml; } else { if(lHistory) lHistory.innerHTML += cardHtml; }
+            // CARRITO
+            if(c && p.cantidad > 0) {
+                const enCarro = carritoGlobal[ds.id] || 0;
+                const active = enCarro > 0 ? "border-indigo-500 bg-indigo-50/50" : "border-slate-100 bg-white";
+                c.innerHTML += `<div id="row-${ds.id}" class="flex items-center justify-between p-3 rounded-xl border ${active} transition-all shadow-sm"><div class="flex items-center gap-3 overflow-hidden">${p.imagen?`<img src="${p.imagen}" class="w-8 h-8 rounded-md object-cover">`:''}<div class="truncate"><p class="font-bold text-xs uppercase text-slate-700 truncate">${nombre}</p><p class="text-[10px] text-slate-400">Disp: ${p.cantidad}</p></div></div><div class="flex items-center gap-2 bg-white rounded-lg p-1 border flex-shrink-0"><button onclick="ajustarCantidad('${ds.id}', -1)" class="w-7 h-7 rounded-md bg-slate-50 font-bold">-</button><span id="cant-${ds.id}" class="w-6 text-center font-bold text-indigo-600 text-sm">${enCarro}</span><button onclick="ajustarCantidad('${ds.id}', 1)" class="w-7 h-7 rounded-md bg-indigo-50 font-bold" ${enCarro>=p.cantidad?'disabled':''}>+</button></div></div>`;
             }
         });
 
+        if(document.getElementById("metrica-total")) document.getElementById("metrica-total").innerText = tr;
+        if(document.getElementById("metrica-stock")) document.getElementById("metrica-stock").innerText = ts;
+        renderChart('stockChart', lb, dt, 'Stock', '#6366f1', stockChart, ch => stockChart = ch);
+    });
+
+    // B) PEDIDOS
+    onSnapshot(collection(db,"pedidos"), s => {
+        pedidosRaw = []; cachePedidos = [];
+        let grupos = {}; 
+        let pendingCount = 0;
+        let sedesCount = {};
+
+        const lAdmin = document.getElementById("lista-pendientes-admin");
+        const lActive = document.getElementById("tab-content-activos");
+        const lHistory = document.getElementById("tab-content-historial");
+
+        if(lAdmin) lAdmin.innerHTML=""; if(lActive) lActive.innerHTML=""; if(lHistory) lHistory.innerHTML="";
+
+        s.forEach(ds => {
+            const p = ds.data(); p.id = ds.id; 
+            pedidosRaw.push(p); cachePedidos.push(p);
+
+            if(p.estado !== 'rechazado') sedesCount[p.ubicacion] = (sedesCount[p.ubicacion] || 0) + p.cantidad;
+
+            const bKey = p.batchId || p.timestamp;
+            if(!grupos[bKey]) grupos[bKey] = { items:[], user:p.usuarioId, sede:p.ubicacion, date:p.fecha, ts:p.timestamp };
+            grupos[bKey].items.push(p);
+
+            if(p.estado === 'pendiente') pendingCount++;
+
+            // Vista Usuario
+            if(p.usuarioId === usuarioActual.id) {
+                let btns = "";
+                if(p.estado === 'aprobado') {
+                    btns = `<div class="mt-3 pt-3 border-t border-slate-50 flex justify-end gap-2"><button onclick="confirmarRecibido('${p.id}')" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow">Recibir</button><button onclick="abrirIncidencia('${p.id}')" class="bg-white border border-red-200 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold">Reportar</button></div>`;
+                } else if(p.estado === 'recibido' || p.estado === 'devuelto') {
+                    btns = `<div class="mt-3 pt-3 border-t border-slate-50 flex justify-end"><button onclick="abrirIncidencia('${p.id}')" class="text-amber-500 text-xs font-bold hover:underline flex items-center gap-1"><i class="fas fa-undo"></i> Devolver / Reportar</button></div>`;
+                }
+                const cardHtml = `<div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition"><div class="flex justify-between items-start"><div><span class="badge status-${p.estado}">${p.estado}</span><h4 class="font-black text-slate-700 uppercase text-sm mt-2">${p.insumoNom}</h4><p class="text-xs text-slate-400 font-mono mt-1">x${p.cantidad} • ${p.ubicacion}</p></div></div>${btns}</div>`;
+                if(['pendiente', 'aprobado'].includes(p.estado)) { if(lActive) lActive.innerHTML += cardHtml; } 
+                else { if(lHistory) lHistory.innerHTML += cardHtml; }
+            }
+        });
+
+        // Vista Admin (Grupos)
         if(lAdmin && ['admin','manager','supervisor'].includes(usuarioActual.rol)) {
             Object.values(grupos).sort((a,b) => b.ts - a.ts).forEach(g => {
                 const pendingItems = g.items.filter(i => i.estado === 'pendiente');
@@ -221,20 +362,24 @@ function activarSincronizacion() {
                 }
             });
         }
+
         if(document.getElementById("metrica-pedidos")) document.getElementById("metrica-pedidos").innerText = pendingCount;
-        renderChart('locationChart', Object.keys(sedesCount), Object.values(sedesCount), 'Sedes', '#10b981', locationChart, c => locationChart = c);
+        renderChart('locationChart', Object.keys(sedesCount), Object.values(sedesCount), 'Sedes', '#10b981', locationChart, ch => locationChart = ch);
         renderHistorialUnificado();
     });
 
+    // C) ENTRADAS
     onSnapshot(collection(db,"entradas_stock"), s => {
         cacheEntradas = []; s.forEach(x => { const d = x.data(); d.id = x.id; cacheEntradas.push(d); });
         renderHistorialUnificado();
     });
 
+    // D) USUARIOS
     if(usuarioActual.rol === 'admin') {
         onSnapshot(collection(db, "usuarios"), snap => {
             const l = document.getElementById("lista-usuarios-db");
-            if(l) { l.innerHTML = "";
+            if(l) { 
+                l.innerHTML = "";
                 snap.forEach(d => {
                     const u = d.data();
                     l.innerHTML += `<div class="bg-white p-4 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm hover:shadow-md transition"><div><div class="flex items-center gap-2"><span class="font-bold uppercase text-slate-700">${d.id}</span><span class="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase font-bold">${u.rol}</span></div><span class="text-xs text-slate-400 block mt-1"><i class="fas fa-envelope text-[10px]"></i> ${u.email || 'Sin correo'}</span></div><div class="flex gap-2"><button onclick="prepararEdicionUsuario('${d.id}','${u.pass}','${u.rol}','${u.email||''}')" class="w-8 h-8 rounded bg-indigo-50 text-indigo-500 hover:bg-indigo-600 hover:text-white transition flex items-center justify-center"><i class="fas fa-pen text-xs"></i></button><button onclick="eliminarDato('usuarios','${d.id}')" class="w-8 h-8 rounded bg-slate-50 text-red-400 hover:bg-red-500 hover:text-white transition flex items-center justify-center"><i class="fas fa-trash-alt text-xs"></i></button></div></div>`;
@@ -244,9 +389,12 @@ function activarSincronizacion() {
     }
 }
 
+// 7. RENDERIZADO TABLAS Y GRAFICOS
 function renderHistorialUnificado() {
     const t = document.getElementById("tabla-movimientos-unificados");
-    if(!t) return; t.innerHTML = "";
+    if(!t) return;
+    t.innerHTML = "";
+    
     const entradasFmt = cacheEntradas.map(e => ({ fecha:e.fecha, ts:e.timestamp, tipo:'ENTRADA', insumo:e.insumo, cant:e.cantidad, det:`${e.usuario} (Stock)`, est:'completado' }));
     const salidasFmt = cachePedidos.map(p => ({ fecha:p.fecha, ts:p.timestamp, tipo:'SALIDA', insumo:p.insumoNom, cant:p.cantidad, det:`${p.usuarioId} (${p.ubicacion})`, est:p.estado }));
     
@@ -256,7 +404,7 @@ function renderHistorialUnificado() {
     });
 }
 
-// --- 7. EXCEL CON 3 TABLAS SEPARADAS (FIX CORRUPCIÓN) ---
+// --- 8. LÓGICA EXCEL REPARADA ---
 window.descargarReporte = async () => {
     if(!confirm("¿Descargar reporte en Excel?")) return;
     
@@ -266,7 +414,6 @@ window.descargarReporte = async () => {
         getDocs(collection(db, "pedidos"))
     ]);
     
-    // Armado del HTML para Excel, usando el BOM (\ufeff) para los acentos
     let htmlStr = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
@@ -281,7 +428,7 @@ window.descargarReporte = async () => {
         <body>
     `;
     
-    // --- TABLA 1: INVENTARIO ACTUAL ---
+    // TABLA 1: STOCK
     htmlStr += `<h2>1. INVENTARIO (STOCK ACTUAL)</h2>
         <table>
             <thead>
@@ -299,7 +446,7 @@ window.descargarReporte = async () => {
     });
     htmlStr += `</tbody></table>`;
     
-    // --- TABLA 2: HISTORIAL DE ENTRADAS ---
+    // TABLA 2: ENTRADAS
     htmlStr += `<h2>2. HISTORIAL DE ENTRADAS (STOCK AGREGADO)</h2>
         <table>
             <thead>
@@ -317,7 +464,7 @@ window.descargarReporte = async () => {
     });
     htmlStr += `</tbody></table>`;
     
-    // --- TABLA 3: HISTORIAL DE SALIDAS ---
+    // TABLA 3: SALIDAS
     htmlStr += `<h2>3. HISTORIAL DE SALIDAS (PEDIDOS)</h2>
         <table>
             <thead>
@@ -337,7 +484,6 @@ window.descargarReporte = async () => {
     });
     htmlStr += `</tbody></table></body></html>`;
     
-    // Exportar archivo
     const blob = new Blob(['\ufeff', htmlStr], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -348,7 +494,7 @@ window.descargarReporte = async () => {
     document.body.removeChild(link);
 };
 
-// --- 8. LÓGICA DE NEGOCIO (RESTO DE FUNCIONES) ---
+// --- 9. LOGICA DE NEGOCIO ---
 window.ajustarCantidad = (i,d) => {
     const n = Math.max(0, (carritoGlobal[i]||0) + d); carritoGlobal[i] = n; 
     document.getElementById(`cant-${i}`).innerText = n;
@@ -445,6 +591,7 @@ window.confirmarRecibido = async (pid) => {
     }
 };
 
+// DOM HELPERS
 window.prepararEdicionProducto=async(id)=>{const s=await getDoc(doc(db,"inventario",id)); if(!s.exists())return; const d=s.data(); document.getElementById('edit-prod-id').value=id; document.getElementById('edit-prod-precio').value=d.precio||''; document.getElementById('edit-prod-min').value=d.stockMinimo||''; document.getElementById('edit-prod-img').value=d.imagen||''; if(d.imagen)document.getElementById('preview-img').src=d.imagen,document.getElementById('preview-img').classList.remove('hidden'); document.getElementById('modal-detalles').classList.remove('hidden');};
 window.guardarDetallesProducto=async()=>{const id=document.getElementById('edit-prod-id').value, p=parseFloat(document.getElementById('edit-prod-precio').value)||0, m=parseInt(document.getElementById('edit-prod-min').value)||0, i=document.getElementById('edit-prod-img').value; await updateDoc(doc(db,"inventario",id),{precio:p,stockMinimo:m,imagen:i}); cerrarModalDetalles(); alert("Guardado");};
 window.guardarUsuario=async()=>{const id=document.getElementById("new-user").value.trim().toLowerCase(), p=document.getElementById("new-pass").value.trim(), e=document.getElementById("new-email").value.trim(), r=document.getElementById("new-role").value; if(!id||!p)return alert("Faltan datos"); await setDoc(doc(db,"usuarios",id),{pass:p,rol:r,email:e},{merge:true}); alert("Guardado"); cancelarEdicionUsuario();};
