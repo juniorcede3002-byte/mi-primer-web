@@ -101,8 +101,11 @@ window.cargarSesion = (datos) => {
     window.usuarioActual = datos;
     localStorage.setItem("fcilog_session", JSON.stringify(datos));
     
-    document.getElementById("pantalla-login").classList.add("hidden");
-    document.getElementById("interfaz-app").classList.remove("hidden");
+    const pantallaLogin = document.getElementById("pantalla-login");
+    const interfazApp = document.getElementById("interfaz-app");
+    
+    if(pantallaLogin) pantallaLogin.classList.add("hidden");
+    if(interfazApp) interfazApp.classList.remove("hidden");
     
     const infoDiv = document.getElementById("info-usuario");
     if(infoDiv) {
@@ -410,7 +413,7 @@ window.renderHistorialUnificado = () => {
 
 // --- 6. FUNCIONES DE NEGOCIO ---
 
-// A) CREACIÓN DE PEDIDOS (OPTIMIZADO CON WRITEBATCH)
+// A) CREACIÓN DE PEDIDOS (LIGERO CON WRITEBATCH)
 window.ajustarCantidad = (i,d) => {
     const n = Math.max(0, (window.carritoGlobal[i]||0) + d); 
     window.carritoGlobal[i] = n; 
@@ -430,7 +433,6 @@ window.procesarSolicitudMultiple = async () => {
     const itemsData = items.map(([ins, cant]) => ({ insumo: ins, cantidad: cant }));
     
     try {
-        // Uso de Lotes (Batch) para rendimiento ultra rápido
         const batch = writeBatch(db);
         
         items.forEach(([ins, cant]) => {
@@ -447,7 +449,7 @@ window.procesarSolicitudMultiple = async () => {
             });
         });
         
-        await batch.commit(); // Ejecuta todo de una vez
+        await batch.commit(); 
         
         window.enviarEmailNotificacion('nuevo_pedido', { usuario: window.usuarioActual.id, sede: ubi, items: itemsData });
         
@@ -630,11 +632,13 @@ window.descargarReporte = async () => {
     htmlStr += `</tbody></table>`;
     
     htmlStr += `<h2>2. HISTORIAL DE ENTRADAS (STOCK AGREGADO)</h2><table><thead><tr style="background-color: #059669;"><th>FECHA Y HORA</th><th>INSUMO</th><th>CANTIDAD AGREGADA</th><th>USUARIO RESPONSABLE</th></tr></thead><tbody>`;
-    e.docs.map(x => x.data()).sort((a,b) => b.timestamp - a.timestamp).forEach(mov => { htmlStr += `<tr><td>${mov.fecha}</td><td>${(mov.insumo || '').toUpperCase()}</td><td>+${mov.cantidad}</td><td>${(mov.usuario || '').toUpperCase()}</td></tr>`; });
+    const entradas = e.docs.map(x => x.data()).sort((a,b) => b.timestamp - a.timestamp);
+    entradas.forEach(mov => { htmlStr += `<tr><td>${mov.fecha}</td><td>${(mov.insumo || '').toUpperCase()}</td><td>+${mov.cantidad}</td><td>${(mov.usuario || '').toUpperCase()}</td></tr>`; });
     htmlStr += `</tbody></table>`;
     
     htmlStr += `<h2>3. HISTORIAL DE SALIDAS (PEDIDOS)</h2><table><thead><tr style="background-color: #d97706;"><th>FECHA Y HORA</th><th>INSUMO</th><th>CANTIDAD SOLICITADA</th><th>SOLICITANTE</th><th>SEDE DESTINO</th><th>ESTADO ACTUAL</th></tr></thead><tbody>`;
-    p.docs.map(x => x.data()).sort((a,b) => b.timestamp - a.timestamp).forEach(mov => { htmlStr += `<tr><td>${mov.fecha}</td><td>${(mov.insumoNom || '').toUpperCase()}</td><td>-${mov.cantidad}</td><td>${(mov.usuarioId || '').toUpperCase()}</td><td>${(mov.ubicacion || '').toUpperCase()}</td><td>${(mov.estado || 'completado').toUpperCase()}</td></tr>`; });
+    const salidas = p.docs.map(x => x.data()).sort((a,b) => b.timestamp - a.timestamp);
+    salidas.forEach(mov => { htmlStr += `<tr><td>${mov.fecha}</td><td>${(mov.insumoNom || '').toUpperCase()}</td><td>-${mov.cantidad}</td><td>${(mov.usuarioId || '').toUpperCase()}</td><td>${(mov.ubicacion || '').toUpperCase()}</td><td>${(mov.estado || 'completado').toUpperCase()}</td></tr>`; });
     htmlStr += `</tbody></table></body></html>`;
     
     const blob = new Blob(['\ufeff', htmlStr], { type: 'application/vnd.ms-excel;charset=utf-8' });
@@ -647,7 +651,7 @@ window.descargarReporte = async () => {
     document.body.removeChild(link);
 };
 
-// --- 8. UTILIDADES DOM ADICIONALES ---
+// --- 8. UTILIDADES DOM ---
 window.prepararEdicionProducto = async (id) => {
     const s = await getDoc(doc(db,"inventario",id)); 
     if(!s.exists()) return; 
@@ -708,7 +712,6 @@ window.cerrarModalInsumo = () => { const m = document.getElementById("modal-insu
 window.cerrarModalDetalles = () => { const m = document.getElementById("modal-detalles"); if(m) m.classList.add("hidden"); const img = document.getElementById('preview-img'); if(img) img.classList.add('hidden');};
 window.eliminarDato = async (c,i) => { if(confirm("¿Estás seguro de eliminar este registro permanentemente?")) await deleteDoc(doc(db,c,i)); };
 
-// CHARTS
 window.renderChart = (id, l, d, t, c, i, s) => { 
     const x = document.getElementById(id); 
     if(!x) return; 
@@ -720,10 +723,48 @@ window.renderChart = (id, l, d, t, c, i, s) => {
     }));
 };
 
-// INIT SYSTEM TRIGGERS ON LOAD
-window.addEventListener('DOMContentLoaded', () => {
-    // Si cloudinary se carga tarde
-    if (typeof cloudinary === "undefined") {
-        setTimeout(window.setupCloudinaryWidget, 2000);
+window.setupCloudinaryWidget = () => {
+    if (typeof cloudinary !== "undefined") {
+        window.cloudinaryWidget = cloudinary.createUploadWidget({
+            cloudName: 'df79cjklp', uploadPreset: 'insumos', sources: ['local', 'camera'], multiple: false, cropping: true, folder: 'fcilog_insumos'
+        }, (error, result) => { 
+            if (!error && result && result.event === "success") { 
+                document.getElementById('edit-prod-img').value = result.info.secure_url;
+                const preview = document.getElementById('preview-img');
+                preview.src = result.info.secure_url;
+                preview.classList.remove('hidden');
+            }
+        });
+        const btnUpload = document.getElementById("upload_widget");
+        if(btnUpload) {
+            const newBtn = btnUpload.cloneNode(true);
+            btnUpload.parentNode.replaceChild(newBtn, btnUpload);
+            newBtn.addEventListener("click", (e) => { e.preventDefault(); if(window.cloudinaryWidget) window.cloudinaryWidget.open(); }, false);
+        }
     }
-});
+};
+
+// --- 9. INICIALIZACIÓN AUTOMÁTICA DE LA APP ---
+const inicializarApp = () => {
+    try {
+        if (typeof emailjs !== "undefined") emailjs.init("2jVnfkJKKG0bpKN-U");
+        
+        // Auto-Login Directo
+        const sesion = localStorage.getItem("fcilog_session");
+        if (sesion) {
+            window.cargarSesion(JSON.parse(sesion));
+        }
+
+        // Widget de imágenes
+        if (typeof cloudinary !== "undefined") {
+            window.setupCloudinaryWidget();
+        } else {
+            setTimeout(() => { if(typeof window.setupCloudinaryWidget === 'function') window.setupCloudinaryWidget(); }, 2000);
+        }
+    } catch (e) {
+        console.error("Error al iniciar aplicación:", e);
+    }
+};
+
+// Se ejecuta de inmediato al leer el script
+inicializarApp();
