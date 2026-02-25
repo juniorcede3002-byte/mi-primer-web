@@ -1,4 +1,3 @@
-/* FUENTES */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
 
 body {
@@ -7,7 +6,6 @@ body {
     color: #0f172a;
 }
 
-/* FORMULARIOS */
 .input-light {
     width: 100%;
     padding: 1rem;
@@ -26,9 +24,7 @@ body {
     box-shadow: 0 0 0 2px #e0e7ff;
 }
 
-.input-light::placeholder {
-    color: #cbd5e1;
-}
+.input-light::placeholder { color: #cbd5e1; }
 
 .label-form {
     display: block;
@@ -41,7 +37,6 @@ body {
     margin-left: 0.25rem;
 }
 
-/* TARJETAS DASHBOARD */
 .card-metrica {
     background-color: #ffffff;
     padding: 1.25rem;
@@ -74,9 +69,7 @@ body {
     transition: transform 0.3s ease;
 }
 
-.card-metrica:hover .icon-box {
-    transform: scale(1.1);
-}
+.card-metrica:hover .icon-box { transform: scale(1.1); }
 
 .card-metrica span {
     font-size: 10px;
@@ -94,7 +87,6 @@ body {
     margin-top: 0.25rem;
 }
 
-/* TABLAS */
 .th-header {
     padding: 1rem;
     font-size: 10px;
@@ -105,7 +97,6 @@ body {
     text-align: left;
 }
 
-/* BADGES (Estados) */
 .badge {
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
@@ -124,13 +115,11 @@ body {
 .status-devuelto { background-color: #faf5ff; color: #9333ea; border-color: #f3e8ff; }
 .status-con_incidencia { background-color: #fef2f2; color: #dc2626; border-color: #fee2e2; }
 
-/* SCROLLBAR */
 .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
 .custom-scroll::-webkit-scrollbar-track { background: transparent; }
 .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-/* ANIMACIONES Y Z-INDEXES SEGURIDAD */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
